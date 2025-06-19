@@ -4,7 +4,6 @@ import { Report } from '../report';
 import { EventEmitter, TriggerService, TimeTrigger, OrderTrigger, PriceTrigger } from '../events';
 import { ReportCard } from '../report/widgets/report-card';
 import { ReportTable } from '../report/widgets/report-table';
-import { TradingViewChart } from '../report/widgets/report-tv';
 import { OrdersBasket } from '../exchange';
 import { ReportChart } from '../report/widgets/report-chart';
 import { BaseObject } from './base-object';
@@ -51,7 +50,6 @@ export class Storage extends BaseObject {
       this.addClass(Report);
       this.addClass(ReportCard);
       this.addClass(ReportTable);
-      this.addClass(TradingViewChart);
       this.addClass(ReportChart);
     }
     if (getArgBoolean('isDebugStorage', false)) {

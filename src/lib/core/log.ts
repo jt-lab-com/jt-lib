@@ -1,6 +1,6 @@
 import { globals } from './globals';
 import { currentTime, currentTimeString } from '../utils/date-time';
-import { getArgBoolean, getArgNumber } from './base';
+import { getArgBoolean } from './base';
 import { BaseError } from './errors';
 
 const LOG_MAX_MESSAGES = 200;

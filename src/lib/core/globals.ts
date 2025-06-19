@@ -4,7 +4,6 @@ import type { Script } from '../script';
 import type { Storage } from './storage';
 import type { BaseObject } from './base-object';
 import type { CandlesBufferService } from '../candles';
-import type { OrdersBasket } from '../exchange';
 import { Indicators } from '../indicators';
 import { getArgBoolean, getArgNumber } from './base';
 
