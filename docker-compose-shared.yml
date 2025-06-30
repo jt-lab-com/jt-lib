@@ -1,0 +1,37 @@
+services:
+  app:
+    image: "jtlab/jtl-worker:${APP_VERSION}"
+    restart: always
+    networks:
+      jtlab:
+    environment:
+      - PORT=80
+      - STRATEGY_FILES_PATH=/www/app/strategy-files/
+      - DATABASE_URL=file:/www/app/storage/storage.db
+      - MARKETS_FILE_PATH=/www/app/markets.json
+      - ARTIFACTS_DIR_PATH=/www/app/artifacts
+      - LOGS_DIR_PATH=/www/app/artifacts
+      - HISTORY_BARS_PATH=/www/app/history-bars
+      - HISTORY_BARS_URL=https://data.binance.vision/data/futures/um/monthly/klines
+      - REDIS_URL=redis://redis.jtlab:6379
+      - ROLLUP_TS_CONFIG=/www/app/tsconfig.bundler.json
+      - SITE_API_HOST=https://jt-lab.com
+      - ENGINE_MODE=realtime
+      - "CCXT_PROXY=${CCXT_PROXY}"
+      - "APP_PORT=${APP_PORT}"
+      - "APP_VERSION=${APP_VERSION}"
+      - "APP_NAME=${APP_NAME}"
+    user: $USER
+    ports:
+      - "${APP_PORT}:80"
+    volumes:
+      - ./src:/www/app/strategy-files
+      - ./storage:/www/app/storage
+      - ./history-bars:/www/app/history-bars
+      - ./markets.json:/www/app/markets.json
+      - ./artifacts:/www/app/artifacts
+
+networks:
+  default:
+  jtlab:
+    external: true
