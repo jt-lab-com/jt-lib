@@ -4,7 +4,9 @@ import { currentTime, timeCurrent, timeToStrHms, timeToString } from '../../util
 import { error, log } from '../../core/log';
 import { ChartType } from '../widgets/report-chart';
 import { getArgString } from '../../core/base';
-import { max, normalize, numberToCurrency, validateNumbersInObject } from '../../utils/numbers';
+import { abs, max, min, normalize, numberToCurrency, validateNumbersInObject } from '../../utils/numbers';
+
+
 
 export class StandardReportLayout extends BaseObject {
   version = '2.08';
@@ -238,7 +240,7 @@ export class StandardReportLayout extends BaseObject {
         pos['lastprice'] = close();
       }
 
-      this.maxUpl = Math.min(this.maxUpl, uPnl); //+
+      this.maxUpl = abs(min(this.maxUpl, uPnl)); //+
 
       let profitApi = await getProfit();
       // // debugger;
