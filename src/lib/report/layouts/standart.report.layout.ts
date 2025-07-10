@@ -175,7 +175,7 @@ export class StandardReportLayout extends BaseObject {
         }
       }
 
-      let testedDays = normalize((this._startDate - tms()) / 1000 / 60 / 60 / 24, 0);
+      let testedDays = normalize((tms()-this._startDate) / 1000 / 60 / 60 / 24, 0);
       globals.report.optimizedSetValue('Days', testedDays);
       globals.report.optimizedSetValue('Spend (min)', this.getTesterSpend());
 
