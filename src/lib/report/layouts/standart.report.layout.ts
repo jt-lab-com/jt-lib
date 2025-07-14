@@ -3,7 +3,7 @@ import { globals } from '../../core/globals';
 import { currentTime, timeCurrent, timeToStrHms, timeToString } from '../../utils/date-time';
 import { error, log } from '../../core/log';
 import { ChartType } from '../widgets/report-chart';
-import { getArgString } from '../../core/base';
+import { getArgBoolean, getArgString } from '../../core/base';
 import { abs, max, min, normalize, numberToCurrency, validateNumbersInObject } from '../../utils/numbers';
 
 
@@ -145,7 +145,7 @@ export class StandardReportLayout extends BaseObject {
           volumeUsd += order.price * order.amount;
         }
       }
-      let recoveryFactor = this.maxUpl ? (await getProfit()) / this.maxUpl : 'n/a';
+      let recoveryFactor = this.maxUpl ? (await getProfit()) / abs(this.maxUpl ): 'n/a';
 
       // global.report.optimizedSetValue('Fee calc', feeCalc);
       globals.report.cardSetValue('Symbol', ARGS.symbol);
@@ -154,14 +154,15 @@ export class StandardReportLayout extends BaseObject {
       //  global.report.cardSetValue('Fee calc', feeCalc);
       globals.report.cardSetValue('Profit', profit);
 
-      globals.report.cardSetValue('Max Drawdown', this.maxUpl);
+      globals.report.cardSetValue('Max Drawdown', abs(this.maxUpl));
       globals.report.cardSetValue('RF', recoveryFactor);
       globals.report.cardSetValue('Orders', orders.length);
       globals.report.cardSetValue('Trade Volume', volumeUsd);
 
       //Optimization DATA
+      globals.report.optimizedSetValue('Symbol', ARGS.symbol);
       globals.report.optimizedSetValue('Max size', numberToCurrency(this.maxUsdSize), 'max');
-      globals.report.optimizedSetValue('Max Drawdowm', numberToCurrency(this.maxUpl));
+      globals.report.optimizedSetValue('Max Drawdowm', numberToCurrency(abs(this.maxUpl)));
       globals.report.optimizedSetValue('Orders', orders.length);
       globals.report.optimizedSetValue('Fee', fee);
       globals.report.optimizedSetValue('Profit', profit);
@@ -190,6 +191,9 @@ export class StandardReportLayout extends BaseObject {
       let sTimeStart = timeToString(this.startTimeTester);
       let sTimeEnd = timeToString(this.endTimeTester);
       let secSpend = normalize((this.endTimeTester - this.startTimeTester) / 1000, 0);
+
+      //
+
 
       log(
         'ProReportLayout::onStopTester',
@@ -240,7 +244,7 @@ export class StandardReportLayout extends BaseObject {
         pos['lastprice'] = close();
       }
 
-      this.maxUpl = abs(min(this.maxUpl, uPnl)); //+
+      this.maxUpl = min(this.maxUpl, uPnl); //
 
       let profitApi = await getProfit();
       // // debugger;
@@ -252,6 +256,9 @@ export class StandardReportLayout extends BaseObject {
       globals.report.chartAddPointAgg('Profit/Drawdown', 'Zero', 0, 'last');
       globals.report.chartAddPointAgg('Profit/Drawdown', 'Profit', profitApi, 'max');
       globals.report.chartAddPointAgg('Profit/Drawdown', 'Drawdown', uPnl, 'min');
+
+      globals.report.fullReportChart.addPointAggByDate('Profit', profitApi, 'max');
+      globals.report.fullReportChart.addPointAggByDate('Drawdown', uPnl, 'min');
 
       let sizeUsdSell = posSizeSell * sellPrice;
       let sizeUsdBuy = posSizeBuy * buyPrice;
