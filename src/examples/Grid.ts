@@ -1,9 +1,30 @@
 import { Script } from '../lib/script';
-
 import { StandardReportLayout } from '../lib/report/layouts/standart.report.layout';
 import { GridBasket } from './basket/GridBasket';
 import { globals } from '../lib/core/globals';
 import { currentTime } from '../lib/utils/date-time';
+
+/*
+Multi-coin grid strategy example.
+Strategy logic is based on the GridBasket class.
+
+Parameters:
+ sizeUsd - size of first opening order in USD.
+ gridStepPercent - step between orders in percent.
+ minProfitPercent - profit percent to fix profit and close position all.
+
+Strategy:
+
+1. Create a basket for each symbol.
+2. Start new round -> open long position with market order with sizeUsd.
+3. Create limit orders with gridStepPercent.
+
+After that, we have 2 ways
+  a. - Price goes up and we have profit and close round.
+
+  b. - Price goes down and we open new orders with gridStepPercent and wait for price to go up again and close round.
+
+*/
 
 class Strategy extends Script {
   static definedArgs = [
@@ -19,6 +40,11 @@ class Strategy extends Script {
       key: 'gridStepPercent',
       defaultValue: 5,
     },
+    {
+      key: 'minProfitPercent',
+      defaultValue: 2,
+    }
+
   ];
   baskets: Record<string, GridBasket> = {};
   private reportLayout: StandardReportLayout;
