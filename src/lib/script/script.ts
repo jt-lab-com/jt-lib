@@ -12,7 +12,7 @@ import { errorContext } from '../utils/errors';
 import { Indicators } from '../indicators';
 
 export class Script extends BaseObject {
-  MAX_ORDERS = 20000;
+  MAX_ORDERS = 10000;
   connectionName: string; //required
   symbols: string[] = []; //required
   interval: number; // if set  - onTimer will be called every interval instead of onTick
@@ -257,6 +257,11 @@ export class Script extends BaseObject {
 
   async onStop() {}
 
+
+  /**
+   * This method is called when the script is initialized.
+   * In tester not possible open orders, because quotes are not available yet.
+   */
   async onInit() {}
 
   async onBeforeTick() {}
