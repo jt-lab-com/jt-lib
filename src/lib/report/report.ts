@@ -8,7 +8,7 @@ import { BaseObject } from '../core/base-object';
 import { AggType, ExtendedReportChartOptions } from './types';
 import { BaseError } from '../core/errors';
 
-import { getArgBoolean } from '../core/base';
+import { getArgBoolean, getArgNumber } from '../core/base';
 
 /**
  * Report - provide functionality for create report of trading strategy. Report can be viewed in web interface.
@@ -629,7 +629,10 @@ export class Report extends BaseObject {
         });
       }
 
-      if (getArgBoolean('isMultiSymbols', false)) {
+
+      //Multi-symbols report chart for full report
+      if (getArgNumber('testerMultiSymbols', 0) > 1 && getArgBoolean('withOptimizer', false) === false) {
+        //log('Report::updateReport', 'Multi-symbols repord done ', {}, true);
         this._reportData.blocks.push(await this.fullReportChart.prepareDataToFullReport());
       }
     } catch (e) {

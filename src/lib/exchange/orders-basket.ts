@@ -634,6 +634,7 @@ export class OrdersBasket extends BaseObject {
   };
 
   async closePosition(side: 'long' | 'short', amount: number = undefined, params = {}): Promise<Order> {
+    //TODO: validate side it should be 'long' or 'short'
     const position = await this.getPositionBySide(side);
     if (position.contracts > 0) {
       const reduceSide = side === 'long' ? 'sell' : 'buy';
