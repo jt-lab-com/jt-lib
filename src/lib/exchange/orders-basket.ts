@@ -10,7 +10,7 @@ import {
 } from './types';
 import { BaseError } from '../core/errors';
 import { TriggerService } from '../events';
-import { debug, error, log, logOnce, warning } from '../core/log';
+import { debug, error, log, logOnce, trace, warning } from '../core/log';
 import { getArgBoolean, getArgNumber, getArgString, uniqueId } from '../core/base';
 import { globals } from '../core/globals';
 import { currentTime, timeToString } from '../utils/date-time';
@@ -93,6 +93,7 @@ export class OrdersBasket extends BaseObject {
   async getSymbolInfo() {
     let result = await symbolInfo(this.symbol);
     logOnce('OrdersBasket::getSymbolInfo ' + this.symbol, 'symbolInfo', this.symbolInfo);
+
 
     return result;
   }
@@ -982,6 +983,7 @@ export class OrdersBasket extends BaseObject {
   }
 
   getContractsAmount = (usdAmount: number, executionPrice?: number) => {
+    //TODO check precision of amount and round it
     if (!executionPrice) {
       executionPrice = this.close();
     }
