@@ -141,6 +141,12 @@ export const percentDifference = (a: number, b: number, isAbs = false): number =
   return isAbs ? Math.abs(result) : result;
 };
 
+export function round (number: number, digits = 2): number {
+  if (isNaN(number) || isNaN(digits)) {
+    throw new BaseError('round: at least one of argument is NaN', { number, digits });
+  }
+  return parseFloat(number.toFixed(digits));
+}
 export function rand(min: number, max: number) {
   if (isNaN(min) || isNaN(max)) {
     throw new BaseError('rand: at least one of argument is NaN', { min, max });
