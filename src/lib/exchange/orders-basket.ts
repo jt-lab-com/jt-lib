@@ -360,14 +360,14 @@ export class OrdersBasket extends BaseObject {
     }
     if (this.connectionName.includes('bybit') && !isTester() && order.id) {
       //TODO emulate order for bybit (bybit return only id) -> move it to Environment
-      let emulateOrder = this.emulateOrder(type, side, amount, price, {
+
+      // debug('OrdersBasket::createOrder', 'Emulated order for  bybit', { order, emulateOrder });
+      order = this.emulateOrder(type, side, amount, price, {
         ...orderParams,
         id: order.id,
         error: order.error,
         filled: type === 'market' ? amount : 0,
       });
-      // debug('OrdersBasket::createOrder', 'Emulated order for  bybit', { order, emulateOrder });
-      order = emulateOrder;
     }
 
     this.ordersByClientId.set(clientOrderId, { ...order, userParams });
@@ -989,7 +989,7 @@ export class OrdersBasket extends BaseObject {
       executionPrice = this.close();
     }
     // contractSize = 10 xrp
-    // xrp = 0.5 usd   1 contract = 10 xrp = 5 usd
+    // xrp = 0.5 usd, usdAmount = 5 usd | amount = 5 / 0.5 / 10 = 1
     let amount = usdAmount / executionPrice / this.contractSize;
 
     return amount;
@@ -1000,7 +1000,7 @@ export class OrdersBasket extends BaseObject {
       executionPrice = this.close();
     }
     // contractSize = 10 xrp
-    // xrp = 0.5 usd   1 contract = 10 xrp = 5 usd
+    // xrp = 0.5 usd, contractsAmount = 1 | usdAmount = 1 * 0.5 * 10 = 5
     return contractsAmount * executionPrice * this.contractSize; // 1*0.5*10 = 5
   };
 
