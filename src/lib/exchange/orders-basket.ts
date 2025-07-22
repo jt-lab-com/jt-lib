@@ -939,6 +939,7 @@ export class OrdersBasket extends BaseObject {
   }
 
   async getOpenOrders(since = undefined, limit = 100, params: any = undefined) {
+    //TODO: validate orders type only is open -> clear orders with other status
     // getOpenOrders is not working in tester mode, use getOrders and filter by status
     if (isTester()) {
       let orders = [];
