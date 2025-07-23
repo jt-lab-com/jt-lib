@@ -10,7 +10,7 @@ import {
 } from './types';
 import { BaseError } from '../core/errors';
 import { TriggerService } from '../events';
-import { debug, error, log, logOnce, warning } from '../core/log';
+import { debug, error, log, logOnce, trace, warning } from '../core/log';
 import { getArgBoolean, getArgNumber, getArgString, uniqueId } from '../core/base';
 import { globals } from '../core/globals';
 import { currentTime, timeToString } from '../utils/date-time';
@@ -93,6 +93,7 @@ export class OrdersBasket extends BaseObject {
   async getSymbolInfo() {
     let result = await symbolInfo(this.symbol);
     logOnce('OrdersBasket::getSymbolInfo ' + this.symbol, 'symbolInfo', this.symbolInfo);
+
 
     return result;
   }
@@ -359,14 +360,14 @@ export class OrdersBasket extends BaseObject {
     }
     if (this.connectionName.includes('bybit') && !isTester() && order.id) {
       //TODO emulate order for bybit (bybit return only id) -> move it to Environment
-      let emulateOrder = this.emulateOrder(type, side, amount, price, {
+
+      // debug('OrdersBasket::createOrder', 'Emulated order for  bybit', { order, emulateOrder });
+      order = this.emulateOrder(type, side, amount, price, {
         ...orderParams,
         id: order.id,
         error: order.error,
         filled: type === 'market' ? amount : 0,
       });
-      // debug('OrdersBasket::createOrder', 'Emulated order for  bybit', { order, emulateOrder });
-      order = emulateOrder;
     }
 
     this.ordersByClientId.set(clientOrderId, { ...order, userParams });
@@ -938,6 +939,7 @@ export class OrdersBasket extends BaseObject {
   }
 
   async getOpenOrders(since = undefined, limit = 100, params: any = undefined) {
+    //TODO: validate orders type only is open -> clear orders with other status
     // getOpenOrders is not working in tester mode, use getOrders and filter by status
     if (isTester()) {
       let orders = [];
@@ -982,11 +984,12 @@ export class OrdersBasket extends BaseObject {
   }
 
   getContractsAmount = (usdAmount: number, executionPrice?: number) => {
+    //TODO check precision of amount and round it
     if (!executionPrice) {
       executionPrice = this.close();
     }
     // contractSize = 10 xrp
-    // xrp = 0.5 usd   1 contract = 10 xrp = 5 usd
+    // xrp = 0.5 usd, usdAmount = 5 usd | amount = 5 / 0.5 / 10 = 1
     let amount = usdAmount / executionPrice / this.contractSize;
 
     return amount;
@@ -997,7 +1000,7 @@ export class OrdersBasket extends BaseObject {
       executionPrice = this.close();
     }
     // contractSize = 10 xrp
-    // xrp = 0.5 usd   1 contract = 10 xrp = 5 usd
+    // xrp = 0.5 usd, contractsAmount = 1 | usdAmount = 1 * 0.5 * 10 = 5
     return contractsAmount * executionPrice * this.contractSize; // 1*0.5*10 = 5
   };
 

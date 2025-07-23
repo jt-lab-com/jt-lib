@@ -6,7 +6,7 @@ import { currentTime } from '../lib/utils/date-time';
 
 /*
 Multi-coin grid strategy example.
-Strategy logic is based on the GridBasket class.
+Strategy logic is based in the GridBasket class.
 
 Parameters:
  sizeUsd - size of first opening order in USD.

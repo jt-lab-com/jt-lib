@@ -7,6 +7,7 @@ import type { CandlesBufferService } from '../candles';
 import { Indicators } from '../indicators';
 import { getArgBoolean, getArgNumber } from './base';
 
+
 class GlobalScope {
   private _strategy: Script = null;
   private _triggers: TriggerService = null;
@@ -36,6 +37,9 @@ class GlobalScope {
     this.isTradeAllowed = getArgBoolean('isTradeAllowed', true);
 
     this.IS_NO_LOGS = getArgNumber('isNoLogs', 0); // 0 - logs are enabled, 1 - logs are disabled
+
+    if(this.IS_NO_LOGS) console.warn("GlobalScope::constructor LOGS is disabled IS_NO_LOGS = 1");
+
     this.isDebug = getArgBoolean('isDebug', false);
   }
 
