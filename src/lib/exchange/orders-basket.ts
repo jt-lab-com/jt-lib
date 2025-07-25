@@ -15,7 +15,7 @@ import { getArgBoolean, getArgNumber, getArgString, uniqueId } from '../core/bas
 import { globals } from '../core/globals';
 import { currentTime, timeToString } from '../utils/date-time';
 import { positionProfit } from './heplers';
-import { normalize, validateNumbersInObject } from '../utils/numbers';
+import { isZero, normalize, validateNumbersInObject } from '../utils/numbers';
 import { errorContext } from '../utils/errors';
 
 export class OrdersBasket extends BaseObject {
@@ -236,6 +236,86 @@ export class OrdersBasket extends BaseObject {
   async onOrderChange(order: Order): Promise<any> {
     return { order };
   }
+
+
+  //
+  posSlot: Record<string, Position> = {
+    long: this.getPositionBySide('long'),
+    short: this.getPositionBySide('short'),
+  };
+
+  _updatePosSlot(order: Order): number {
+    if (order.status !== 'closed') {
+      return 0;
+    }
+
+
+    const isReduce = order.reduceOnly;
+    let side = order.side === 'buy' ? 'long' : 'short';
+    if (isReduce) side = side === 'long' ? 'short' : 'long';
+
+    const posSide = side;
+
+
+    const position:Position = this.posSlot[posSide];
+
+    if (!position.side) position.side = side;
+
+    let orderPrice = isTester() ? order.price : order.average;
+
+    if (isZero(orderPrice)) orderPrice = this.close();
+    let pnl = 0;
+    //TODO: check  order.amount or order.filled
+    if (isReduce) {
+      pnl = positionProfit(side, position.entryPrice, orderPrice, order.amount, this.contractSize);
+      position.profit += pnl;
+    }
+
+    if (!isReduce) {
+      position.entryPrice =
+        (position.contracts* position.entryPrice + order.amount * orderPrice) / (position.contracts + order.amount);
+      position.contracts+= order.amount;
+    } else {
+      if (position.contracts- order.amount === 0) {
+        position.entryPrice = 0;
+      }
+      position.contracts-= order.amount;
+    }
+
+    position.contracts = isZero(position.contracts) ? 0 : position.contracts;
+    position.notional = this.getUsdAmount(position.contracts, position.entryPrice);
+
+    if (position.contracts< 0) {
+      throw new BaseError('OrderBasket::_updatePosSlot posSlot.size < 0', { order, pos: this.posSlot });
+    }
+    if (position.contracts> 0 && position.entryPrice <= 0) {
+      throw new BaseError('OrderBasket::_updatePosSlot posSlot.entryPrice <= 0', { order, pos: this.posSlot });
+    }
+
+    // trace('Basket::_updatePosSlot', 'posSlot = ', { posSlot, order, mInfo: await this.marketInfoShort() });
+    this.posSlot[posSide] = position;
+    return pnl;
+
+  }
+
+  async beforeOnPnlChange(order:Order ): Promise<any> {
+    if( order.status === 'closed') {
+      let pnl =  this._updatePosSlot(order);
+      if(pnl) {
+        await this.onPnlChange(pnl, 'pnl' );
+      }
+
+      if(order.fee?.cost) {
+        await this.onPnlChange(order.fee.cost, 'fee');
+      }
+
+    }
+  }
+
+  async onPnlChange(amount:number, type : "fee" | 'pnl' | "transfer",): Promise<any> {
+
+  }
+
 
   /**
    * Create order on exchange
