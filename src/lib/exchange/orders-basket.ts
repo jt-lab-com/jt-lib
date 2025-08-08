@@ -64,7 +64,9 @@ export class OrdersBasket extends BaseObject {
 
     this.setPrefix(params.prefix);
 
+    globals.events.subscribeOnOrderChange(this.beforeOnPnlChange, this, this.symbol);
     globals.events.subscribeOnOrderChange(this.beforeOnOrderChange, this, this.symbol);
+
     globals.events.subscribeOnTick(this.beforeOnTick, this, this.symbol);
 
     this.triggerService = new TriggerService({ idPrefix: this.symbol, symbol: this.symbol });
@@ -228,7 +230,7 @@ export class OrdersBasket extends BaseObject {
 
     //sometimes orders not coming to websocket
     //TODO write test for position update in websocket
-    await this.getPositions(true);
+   // await this.getPositions(true);
 
     return await this.onOrderChange(order);
   }
@@ -292,8 +294,9 @@ export class OrdersBasket extends BaseObject {
       throw new BaseError('OrderBasket::_updatePosSlot posSlot.entryPrice <= 0', { order, pos: this.posSlot });
     }
 
-    // trace('Basket::_updatePosSlot', 'posSlot = ', { posSlot, order, mInfo: await this.marketInfoShort() });
+    //trace('Basket::_updatePosSlot', 'posSlot = ', { pos:this.posSlot, order, price: this.close(), position });
     this.posSlot[posSide] = position;
+
     return pnl;
 
   }
@@ -776,6 +779,8 @@ export class OrdersBasket extends BaseObject {
       };
     });
   }
+
+
 
   async getPositionBySide(side: 'short' | 'long', isForce = false): Promise<Position> {
     if (side !== 'long' && side !== 'short') {
