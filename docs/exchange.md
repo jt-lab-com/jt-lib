@@ -1,13 +1,28 @@
 # OrdersBasket
 ___
 
-OrdersBasket class for working with orders on exchange. In this class realized next features:
-  * Triggered orders
-  * Automate cancel stop orders if one of them executed
+**OrdersBasket** is a universal class for working with orders on the exchange, designed to simplify and automate trading. It combines the functionality of creating, modifying and canceling various types of orders, including market, limit, stop-loss, take-profit and trigger orders.
 
+## Key Features
+
+- **Order creation and management** — supports market, limit, reduce-only, stop-loss, and take-profit orders.
+- **Triggered orders** — ability to store and activate orders locally when a specified price is reached, without placing them in the exchange order book in advance.
+- **Automatic stop management** — automatically cancels related stop orders (SL/TP) when one of them is executed.
+- **Hedge mode** — supports opening positions in both long and short directions simultaneously when hedge mode is enabled.
+- **Simplified trade execution methods** — `buyMarket`, `sellMarket`, `buyLimit`, `sellLimit` functions with automatic SL/TP placement.
+- **Volume calculation** — converts USD amount to contracts and vice versa, using the current or specified execution price.
+- **Market data access** — retrieves bid/ask prices, volumes, high/low/open/close values, and 24-hour trading volume.
+- **Order modification and cancellation** — change the price, size, and other parameters of existing orders.
+- **Subscription management** — unsubscribe from global events and cancel all active price triggers.
 ___
+## Events
+- **`onInit`** - called when `OrdersBasket` is initialized and ready to work.
+- **`onOrderChange`** — called when the order status changes (created, executed, canceled, modified).
+- **`onPnlChange`** — called when the unrealized or realized profit/loss on the position changes.
+- **`onTick`** — called when a new tick of market data arrives (update of price, volumes and other parameters).
 
-* **Methods**
+## Methods
+
   - [createOrder](#createOrder)
   - [createTriggeredOrder](#createTriggeredOrder)
   - [createReduceOrder](#createReduceOrder)
