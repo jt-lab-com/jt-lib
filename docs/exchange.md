@@ -16,7 +16,6 @@ ___
 - **Subscription management** — unsubscribe from global events and cancel all active price triggers.
 ___
 ## Events
-- **`onInit`** - called when `OrdersBasket` is initialized and ready to work.
 - **`onOrderChange`** — called when the order status changes (created, executed, canceled, modified).
 - **`onPnlChange`** — called when the unrealized or realized profit/loss on the position changes.
 - **`onTick`** — called when a new tick of market data arrives (update of price, volumes and other parameters).
