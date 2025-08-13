@@ -47,6 +47,36 @@ ___
   - [unsubscribe](#unsubscribe)
 
 <br>
+**Note: Understanding `triggerType`**
+
+The `triggerType` parameter in the `OrdersBasket` constructor defines **how stop orders (Stop Loss, Take Profit)** are created and managed.  
+It supports two modes:
+
+- **`script` (default)** – Stop orders are **not placed directly on the exchange**.  
+  Instead, they are stored and monitored locally by the `Exchange` class.  
+  When the main order is executed and the market price reaches the trigger level,  
+  the script sends the stop order to the exchange for execution.  
+  This method allows more flexible control, advanced conditions,  
+  and custom risk management logic.
+
+- **`exchange`** – Stop orders are **created immediately on the exchange** when the main order is placed.  
+  Once the main order is executed, stop orders exist directly in the exchange’s order book,  
+  and their execution is handled entirely by the exchange’s internal mechanisms.
+
+**Comparison Table**
+
+| Mode       | Stop order location | Trigger check method      | Pros | Cons |
+|------------|--------------------|---------------------------|------|------|
+| `script`   | Local (in script)  | Handled by `Exchange` code | Full control, custom logic, works on exchanges without native stop orders | Relies on script uptime and connectivity |
+| `exchange` | On exchange        | Handled by exchange        | No need for local monitoring, guaranteed execution if online | Depends on exchange’s stop order features and rules |
+
+
+**Note: Stop Loss & Take Profit orders**  
+
+When setting stop-loss or take-profit orders through the exchange API, the exchange itself does not automatically monitor and cancel them upon trigger execution.  
+In most cases, you need to manually remove the order from the order book (or the trading profile) once it has been triggered to avoid unintended executions.
+
+The `OrdersBasket` class includes a built-in mechanism for this: it monitors stop-loss and take-profit triggers in real time, sends the required market order when conditions are met, and automatically removes related orders from the stack or profile after execution. This ensures that only active and relevant orders remain in the system.
 
 ## [Constructor](#Constructor)
 
@@ -118,7 +148,7 @@ createTriggerOrder(type: OrderType, side: OrderSide, amount: number, triggerPric
 
 * **Returns:** _Promise<[Order](trading-api.md#order)>_.
 
-###### Example
+###### Example 
 ```typescript
 const ordersBasket = new OrdersBasket({ symbol: 'ETH/USDT', exchange: 'binance', hedgeMode: true });
 const triggeredOrder = await ordersBasket.createTriggeredOrder('market', 'buy', 0.5, 2200, 2200);
