@@ -53,9 +53,9 @@ The `triggerType` parameter in the `OrdersBasket` constructor defines **how stop
 It supports two modes:
 
 - **`script` (default)** – Stop orders are **not placed directly on the exchange**.  
-  Instead, they are stored and monitored locally by the `Exchange` class.  
+  Instead, they are stored and monitored locally by the `OrdersBasket` class.  
   When the main order is executed and the market price reaches the trigger level,  
-  the script sends the stop order to the exchange for execution.  
+  the script sends the trigger order to the exchange for execution.  
   This method allows more flexible control, advanced conditions,  
   and custom risk management logic.
 
