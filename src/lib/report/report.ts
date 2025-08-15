@@ -515,7 +515,15 @@ export class Report extends BaseObject {
       if (this.description) {
         this._reportData.blocks.push(new ReportText(this.description, 'subtitle1', 'center').prepareDataToReport());
       }
-
+      if (this.actionButtons) {
+        for (const button in this.actionButtons) {
+          try {
+            this._reportData.blocks.push(this.actionButtons[button].prepareDataToReport());
+          } catch (e) {
+            error(e);
+          }
+        }
+      }
       //----------------CARDS
       if (this.cards) {
         for (let cardName in this.cards) {
@@ -574,15 +582,7 @@ export class Report extends BaseObject {
         });
       }
 
-      if (this.actionButtons) {
-        for (const button in this.actionButtons) {
-          try {
-            this._reportData.blocks.push(this.actionButtons[button].prepareDataToReport());
-          } catch (e) {
-            error(e);
-          }
-        }
-      }
+
 
       let logs = getLogs('error');
 
