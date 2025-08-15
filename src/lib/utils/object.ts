@@ -1,46 +1,51 @@
-// getAllObjectFunctions = (toCheck: Object): string[] => {
-//     const props = [];
-//     let obj = toCheck;
-//
-//     if (!obj) return [];
-//     while (obj.constructor.name !== 'Object') {
-//       props.push(...Object.getOwnPropertyNames(obj));
-//       obj = Object.getPrototypeOf(obj);
-//     }
-//
-//     return props.sort().filter((e, i, arr) => {
-//       if (e != arr[i + 1] && typeof toCheck[e] == 'function') return true;
-//     });
-//   };
+
 
 export function objectGetAllFunctions(obj: any): string[] {
-  const props: string[] = [];
-  let currentObj: any = obj;
+  if (obj == null) return [];
 
-  if (!currentObj) return [];
+  const fns: string[] = [];
+  let current: any = obj;
 
-  while (currentObj.constructor.name !== 'Object') {
-    props.push(...Object.getOwnPropertyNames(currentObj));
-    currentObj = Object.getPrototypeOf(currentObj);
+  // Идём по прототипам до Object.prototype; для null-прото — остановимся на null.
+  while (current && current !== Object.prototype) {
+    for (const name of Object.getOwnPropertyNames(current)) {
+      const desc = Object.getOwnPropertyDescriptor(current, name);
+      // Берём только свойства-значения, которые являются функциями (без аксессоров)
+      if (desc && 'value' in desc && typeof desc.value === 'function') {
+        fns.push(name);
+      }
+    }
+    current = Object.getPrototypeOf(current);
   }
 
-  return props.sort().filter((e, i, arr) => {
-    return e !== arr[i + 1] && typeof obj[e] === 'function';
-  });
+  // Уберём дубли и служебный constructor
+  return Array.from(new Set(fns))
+    .filter((n) => n !== 'constructor')
+    .sort();
 }
-
 export function objectGetAllProperties(obj: any): string[] {
+  if (obj == null) return [];
+
   const props: string[] = [];
-  let currentObj: any = obj;
+  let current: any = obj;
 
-  if (!currentObj) return [];
 
-  while (currentObj.constructor.name !== 'Object') {
-    props.push(...Object.getOwnPropertyNames(currentObj));
-    currentObj = Object.getPrototypeOf(currentObj);
+  while (current && current !== Object.prototype) {
+    for (const name of Object.getOwnPropertyNames(current)) {
+      const desc = Object.getOwnPropertyDescriptor(current, name);
+      // Берём только «значенческие» свойства, не функции и не аксессоры
+      if (desc && 'value' in desc && typeof desc.value !== 'function') {
+        props.push(name);
+      }
+    }
+
+    const nextProto = Object.getPrototypeOf(current);
+    if (nextProto === null) break;
+    current = nextProto;
   }
 
-  return props.sort().filter((e, i, arr) => {
-    return e !== arr[i + 1] && typeof obj[e] !== 'function';
-  });
+  // Удаляем дубли и сортируем
+  return Array.from(new Set(props)).sort();
 }
+
+
