@@ -515,6 +515,19 @@ export class Report extends BaseObject {
       if (this.description) {
         this._reportData.blocks.push(new ReportText(this.description, 'subtitle1', 'center').prepareDataToReport());
       }
+
+      //----------------TEXTS
+      if (this.texts) {
+        for (const textName in this.texts) {
+          try {
+            let textInfo = this.texts[textName].prepareDataToReport();
+            this._reportData.blocks.push(textInfo);
+          } catch (e) {
+            error(e);
+          }
+        }
+      }
+
       if (this.actionButtons) {
         for (const button in this.actionButtons) {
           try {
