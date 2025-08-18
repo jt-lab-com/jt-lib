@@ -129,7 +129,7 @@ export class BaseScript extends BaseObject  {
       this.isInitialized = true;
       await this.onInit();
     } catch (e) {
-      error('BaseScript::init', e);
+      throw errorContext(e, {});
     } finally {
       this.isInitialized = false;
     }
