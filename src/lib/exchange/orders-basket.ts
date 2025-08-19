@@ -178,8 +178,9 @@ export class OrdersBasket extends BaseObject {
       // const stopOrders = this.stopOrdersByOwnerShortId.get(ownerClientOrderId);
 
       if (
-        triggerOrderType === 'TP' ||
-        (triggerOrderType === 'SL' && order.status === 'closed' && this.triggerType === 'exchange')
+        (triggerOrderType === 'TP' || triggerOrderType === 'SL') &&
+        order.status === 'closed' &&
+        this.triggerType === 'exchange'
       ) {
         if (triggerOrderType === 'TP') {
           let slOrderId = order.clientOrderId.replace('.TP', '.SL');
@@ -249,6 +250,13 @@ export class OrdersBasket extends BaseObject {
 
     position.contracts = isZero(position.contracts) ? 0 : position.contracts;
     position.notional = this.getUsdAmount(position.contracts, position.entryPrice);
+    position.unrealizedPnl = positionProfit(
+      side,
+      position.entryPrice,
+      this.close(),
+      position.contracts,
+      this.contractSize,
+    );
 
     if (position.contracts < 0) {
       throw new BaseError('OrderBasket::_updatePosSlot posSlot.size < 0', { order, pos: this.posSlot });
