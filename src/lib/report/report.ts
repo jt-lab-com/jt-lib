@@ -516,6 +516,27 @@ export class Report extends BaseObject {
         this._reportData.blocks.push(new ReportText(this.description, 'subtitle1', 'center').prepareDataToReport());
       }
 
+      //----------------TEXTS
+      if (this.texts) {
+        for (const textName in this.texts) {
+          try {
+            let textInfo = this.texts[textName].prepareDataToReport();
+            this._reportData.blocks.push(textInfo);
+          } catch (e) {
+            error(e);
+          }
+        }
+      }
+
+      if (this.actionButtons) {
+        for (const button in this.actionButtons) {
+          try {
+            this._reportData.blocks.push(this.actionButtons[button].prepareDataToReport());
+          } catch (e) {
+            error(e);
+          }
+        }
+      }
       //----------------CARDS
       if (this.cards) {
         for (let cardName in this.cards) {
@@ -574,15 +595,7 @@ export class Report extends BaseObject {
         });
       }
 
-      if (this.actionButtons) {
-        for (const button in this.actionButtons) {
-          try {
-            this._reportData.blocks.push(this.actionButtons[button].prepareDataToReport());
-          } catch (e) {
-            error(e);
-          }
-        }
-      }
+
 
       let logs = getLogs('error');
 
