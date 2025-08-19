@@ -15,8 +15,9 @@ import { getArgBoolean, getArgNumber, getArgString, uniqueId } from '../core/bas
 import { globals } from '../core/globals';
 import { currentTime, timeToString } from '../utils/date-time';
 import { positionProfit } from './heplers';
-import { normalize, validateNumbersInObject } from '../utils/numbers';
+import { isZero, normalize, validateNumbersInObject } from '../utils/numbers';
 import { errorContext } from '../utils/errors';
+import { sleep } from '../utils/misc';
 
 export class OrdersBasket extends BaseObject {
   LEVERAGE_INFO_KEY = 'exchange-leverage-info-';
@@ -56,15 +57,17 @@ export class OrdersBasket extends BaseObject {
       throw new BaseError('OrdersBasket::::constructor Argument "symbol" is not defined', params);
     }
 
-    this.triggerType = params.triggerType ?? 'script';
     this.connectionName = params.connectionName || getArgString('connectionName', undefined);
+    this.triggerType = params.triggerType ?? 'script'; // exchange or script
     this.symbol = params.symbol; // TODO validate symbol
     this.leverage = params.leverage ?? this.leverage;
     this.hedgeMode = params.hedgeMode || getArgBoolean('hedgeMode', undefined) || false;
 
     this.setPrefix(params.prefix);
 
+    globals.events.subscribeOnOrderChange(this.beforeOnPnlChange, this, this.symbol);
     globals.events.subscribeOnOrderChange(this.beforeOnOrderChange, this, this.symbol);
+
     globals.events.subscribeOnTick(this.beforeOnTick, this, this.symbol);
 
     this.triggerService = new TriggerService({ idPrefix: this.symbol, symbol: this.symbol });
@@ -72,33 +75,15 @@ export class OrdersBasket extends BaseObject {
     this.triggerService.registerPriceHandler(params.symbol, 'executeTakeProfit', this.createOrderByTrigger, this);
     this.triggerService.registerPriceHandler(params.symbol, 'createOrderByTrigger', this.createOrderByTrigger, this);
 
+    this.triggerService.registerOrderHandler('creteSlTpByTriggers', this.createSlTpByTriggers, this);
+    this.triggerService.registerOrderHandler('cancelSlTpByTriggers', this.cancelSlTpByTriggers, this);
+
     this.addChild(this.triggerService);
   }
 
-  private async beforeOnTick() {
-    return await this.onTick();
-  }
-
-  async onTick(): Promise<any> {
-    return { class: 'OrdersBasket' };
-  }
-  private set connectionName(value: string) {
-    this._connectionName = value;
-  }
-
-  get connectionName(): string {
-    return this._connectionName;
-  }
-
-  async getSymbolInfo() {
-    let result = await symbolInfo(this.symbol);
-    logOnce('OrdersBasket::getSymbolInfo ' + this.symbol, 'symbolInfo', this.symbolInfo);
-
-
-    return result;
-  }
   async init() {
     this.symbolInfo = await this.getSymbolInfo();
+    logOnce('OrdersBasket::getSymbolInfo ' + this.symbol, 'symbolInfo', this.symbolInfo);
     this.isInit = true;
 
     if (!isTester()) {
@@ -147,6 +132,14 @@ export class OrdersBasket extends BaseObject {
       minContractBase: this._minContractBase,
       minContractStep: this.minContractStep,
     });
+
+    //Positions slot initialization
+
+    this.posSlot['long'] = await this.getPositionBySide('long', true);
+    this.posSlot['short'] = await this.getPositionBySide('short');
+  }
+  private async beforeOnTick() {
+    return await this.onTick();
   }
 
   updateLimits() {
@@ -182,53 +175,30 @@ export class OrdersBasket extends BaseObject {
 
     try {
       this.ordersByClientId.set(order.clientOrderId, { ...order, userParams: {} });
-      const stopOrders = this.stopOrdersByOwnerShortId.get(ownerClientOrderId);
+      // const stopOrders = this.stopOrdersByOwnerShortId.get(ownerClientOrderId);
 
-      // cancel stop orders if one of them is fulfilled.
-      if (order.status === 'closed' && !!stopOrders) {
-        const { slOrderId, tpOrderId } = stopOrders;
-
-        if (order.id === slOrderId && tpOrderId) {
-          await this.cancelOrder(tpOrderId);
-        }
-
-        if (order.id === tpOrderId && slOrderId) {
+      if (
+        (triggerOrderType === 'TP' || triggerOrderType === 'SL') &&
+        order.status === 'closed' &&
+        this.triggerType === 'exchange'
+      ) {
+        if (triggerOrderType === 'TP') {
+          let slOrderId = order.clientOrderId.replace('.TP', '.SL');
           await this.cancelOrder(slOrderId);
         }
-      }
 
-      // cancel stop orders if one of them is executed.
-      if (order.status === 'canceled' && !!stopOrders && this.triggerType === 'exchange') {
-        const { slOrderId, tpOrderId } = stopOrders;
-        if (slOrderId) {
-          await this.cancelOrder(slOrderId);
-        }
-        if (tpOrderId) {
+        if (triggerOrderType === 'SL') {
+          let tpOrderId = order.clientOrderId.replace('.SL', '.TP');
           await this.cancelOrder(tpOrderId);
         }
       }
-
-      const stopOrderQueue = this.stopOrdersQueue.get(order.clientOrderId);
-      // If executed order has SL or TP params, create stop orders
-      if (order.status === 'closed' && stopOrderQueue) {
-        await this.createSlTpOrders(order.clientOrderId, stopOrderQueue.sl, stopOrderQueue.tp);
-      }
-      log('OrdersBasket::onOrderChange', `${order.clientOrderId} ${order.status}`, {
-        order,
-        prefix,
-        ownerClientOrderId,
-        shortClientId,
-        stopOrderQueue,
-        stopOrders,
-        triggerOrderType,
-      });
     } catch (e) {
       error(e, { order });
     }
 
     //sometimes orders not coming to websocket
     //TODO write test for position update in websocket
-    await this.getPositions(true);
+    // await this.getPositions(true);
 
     return await this.onOrderChange(order);
   }
@@ -236,6 +206,105 @@ export class OrdersBasket extends BaseObject {
   async onOrderChange(order: Order): Promise<any> {
     return { order };
   }
+
+  posSlot: Record<string, Position> = {
+    long: this.emulatePosition('long'),
+    short: this.emulatePosition('short'),
+  };
+
+  private _updatePosSlot(order: Order): number {
+    if (order.status !== 'closed') {
+      return 0;
+    }
+
+    const isReduce = order.reduceOnly;
+    let side = order.side === 'buy' ? 'long' : 'short';
+    if (isReduce) side = side === 'long' ? 'short' : 'long';
+
+    const posSide = side;
+
+    const position: Position = this.posSlot[posSide];
+
+    if (!position.side) position.side = side;
+
+    let orderPrice = isTester() ? order.price : order.average;
+
+    if (isZero(orderPrice)) orderPrice = this.close();
+    let pnl = 0;
+    //TODO: check  order.amount or order.filled
+    if (isReduce) {
+      pnl = positionProfit(side, position.entryPrice, orderPrice, order.amount, this.contractSize);
+      position.profit += pnl;
+    }
+
+    if (!isReduce) {
+      position.entryPrice =
+        (position.contracts * position.entryPrice + order.amount * orderPrice) / (position.contracts + order.amount);
+      position.contracts += order.amount;
+    } else {
+      if (position.contracts - order.amount === 0) {
+        position.entryPrice = 0;
+      }
+      position.contracts -= order.amount;
+    }
+
+    position.contracts = isZero(position.contracts) ? 0 : position.contracts;
+    position.notional = this.getUsdAmount(position.contracts, position.entryPrice);
+    position.unrealizedPnl = positionProfit(
+      side,
+      position.entryPrice,
+      this.close(),
+      position.contracts,
+      this.contractSize,
+    );
+
+    if (position.contracts < 0) {
+      throw new BaseError('OrderBasket::_updatePosSlot posSlot.size < 0', { order, pos: this.posSlot });
+    }
+    if (position.contracts > 0 && position.entryPrice <= 0) {
+      throw new BaseError('OrderBasket::_updatePosSlot posSlot.entryPrice <= 0', { order, pos: this.posSlot });
+    }
+
+    this.posSlot[posSide] = position;
+
+    return pnl;
+  }
+
+  async beforeOnPnlChange(order: Order): Promise<any> {
+    try {
+      if (order.status === 'closed') {
+        let pnl = this._updatePosSlot(order);
+        if (pnl) {
+          await this.onPnlChange(pnl, 'pnl');
+          await globals.events.emit('onPnlChange', { type: 'pnl', amount: pnl });
+        }
+
+        if (order.fee?.cost) {
+          await this.onPnlChange(order.fee.cost, 'fee');
+          await globals.events.emit('onPnlChange', { type: 'fee', amount: order.fee.cost });
+        }
+      }
+    } catch (e) {
+      error(e, { order });
+    }
+  }
+
+  async onPnlChange(amount: number, type: 'fee' | 'pnl' | 'transfer'): Promise<any> {}
+
+  createSlTpByTriggers = async (args: { clientOrderId: string; symbol: string; sl: number; tp: number }) => {
+    //  trace('OrdersBasket::creteSlTpByTriggers', 'Creating SL/TP by triggers', args);
+    let { slOrder, tpOrder } = await this.createSlTpOrders(args.clientOrderId, args.sl, args.tp);
+  };
+
+  cancelSlTpByTriggers = async (args: { taskId?: string; clientOrderId?: string }) => {
+    if (!args.clientOrderId) {
+      await this.cancelOrder(args.clientOrderId);
+    }
+
+    if (args.taskId) {
+      this.triggerService.cancelOrderTask(args.taskId);
+    }
+  };
 
   /**
    * Create order on exchange
@@ -285,11 +354,27 @@ export class OrdersBasket extends BaseObject {
     // If stop orders params set, save it to stopOrdersQueue then this params will be used in onOrderChange function
     // stop orders will be created when owner order executed (status = 'closed')
     if (params['sl'] || params['tp']) {
+      const sl = params['sl'] || 0;
+      const tp = params['tp'] || 0;
       this.stopOrdersQueue.set(clientOrderId, {
         ownerOrderId: clientOrderId,
         sl: params['sl'] as number,
         tp: params['tp'] as number,
         prefix: this.prefix,
+      });
+
+      let taskId = this.triggerService.addTaskByOrder({
+        clientOrderId,
+        args: { clientOrderId, sl, tp },
+        name: 'creteSlTpByTriggers',
+        status: 'closed',
+      });
+
+      this.triggerService.addTaskByOrder({
+        clientOrderId,
+        args: { taskId },
+        name: 'cancelSlTpByTriggers',
+        status: 'canceled',
       });
 
       log('OrdersBasket::createOrder', 'Stop orders params saved', this.stopOrdersQueue.get(clientOrderId));
@@ -452,6 +537,13 @@ export class OrdersBasket extends BaseObject {
     return this.prefix;
   }
 
+  /**
+   * Create market buy order (futures opened long position)
+   * @param amount - order amount of the base currency (for futures - contracts)
+   * @param tp - take profit price if tp = 0, take profit order will not be created
+   * @param sl - stop loss price if sl = 0, stop loss order will not be created
+   * @param params - params for createOrder function (see createOrder function)
+   */
   async buyMarket(amount: number, tp?: number, sl?: number, params = {}): Promise<Order> {
     return this.createOrder('market', 'buy', amount, this.close(), { ...params, tp, sl });
   }
@@ -516,21 +608,13 @@ export class OrdersBasket extends BaseObject {
         error('Exchange:cancelOrder ', 'orderId must be string ', { orderId, orderIdType: typeof orderId });
         return {};
       }
-      const order = await cancelOrder(orderId, this.symbol);
+      let order = await cancelOrder(orderId, this.symbol);
 
-      if (isTester()) {
-        const order = await getOrder(orderId);
-        if (order.status !== 'canceled' && order.status !== 'closed') {
-          error('Exchange:cancelOrder ', 'Order not canceled', {
-            orderId,
-            symbol: this.symbol,
-            order,
-          });
-          return;
-        }
+      if (!order || !order.id) {
+        warning('Exchange:cancelOrder', 'Order not found or already canceled', { orderId, symbol: this.symbol });
       }
 
-      log('Exchange:cancelOrder', 'Order canceled', { orderId, symbol: this.symbol });
+      log('Exchange:cancelOrder', 'Order canceled', { orderId, symbol: this.symbol, order: { ...order } });
 
       return order;
     } catch (e) {
@@ -697,12 +781,38 @@ export class OrdersBasket extends BaseObject {
     });
   }
 
+  private emulatePosition(side: 'long' | 'short') {
+    return {
+      emulated: true,
+      side: side,
+      symbol: this.symbol,
+      entryPrice: 0,
+      contracts: 0,
+      unrealizedPnl: 0,
+      leverage: 0,
+      liquidationPrice: 0,
+      collateral: 0,
+      notional: 0,
+      markPrice: 0,
+      timestamp: 0,
+      initialMargin: 0,
+      initialMarginPercentage: 0,
+      maintenanceMargin: 0,
+      maintenanceMarginPercentage: 0,
+      marginRatio: 0,
+      datetime: '',
+      hedged: this.hedgeMode,
+      percentage: 0,
+      contractSize: 0,
+    };
+  }
   async getPositionBySide(side: 'short' | 'long', isForce = false): Promise<Position> {
     if (side !== 'long' && side !== 'short') {
-      throw new BaseError(`OrdersBasketgetPositionBySide`, `wrong position side: ${side}`);
+      throw new BaseError(`OrdersBasket::getPositionBySide`, `wrong position side: ${side}`);
     }
 
     const positions = await this.getPositions(isForce);
+
     let pos;
 
     if (!isTester()) {
@@ -717,35 +827,18 @@ export class OrdersBasket extends BaseObject {
     }
 
     if (!pos) {
-      return {
-        emulated: true,
-        side: side,
-        symbol: this.symbol,
-        entryPrice: 0,
-        contracts: 0,
-        unrealizedPnl: 0,
-        leverage: 0,
-        liquidationPrice: 0,
-        collateral: 0,
-        notional: 0,
-        markPrice: 0,
-        timestamp: 0,
-        initialMargin: 0,
-        initialMarginPercentage: 0,
-        maintenanceMargin: 0,
-        maintenanceMarginPercentage: 0,
-        marginRatio: 0,
-        datetime: '',
-        hedged: this.hedgeMode,
-        percentage: 0,
-        contractSize: 0,
-      };
+      return this.emulatePosition(side);
     }
     return pos;
   }
 
   async getPositions(isForce = false) {
-    return await getPositions([this.symbol], { forceFetch: isForce });
+    let positions = await getPositions([this.symbol], { forceFetch: isForce });
+
+    if (!isTester() && globals.isDebug) {
+      logOnce('OrdersBasket::getPositions', this.symbol, { positions, isForce });
+    }
+    return positions;
   }
 
   private async createSlTpOrders(ownerClientOrderId: string, sl?: number, tp?: number) {
@@ -806,6 +899,22 @@ export class OrdersBasket extends BaseObject {
 
     return this.createOrder(type, side, amount, price, params);
   }
+
+  /**
+   * Generate unique client order id for order
+   * @param prefix - unique prefix for orders basket
+   * @param type - 'market' or 'limit'
+   * @param isReduce - if true, order is reduce only
+   * @param ownerClientOrderId - if order is linked to another order, this is owner order id
+   * @param triggerOrderType - 'SL' or 'TP' for linked stop orders
+   * @returns {string} - generated client order id
+   * Example:
+   * market order - 1691234567890-uniquePrefix-M1234
+   * limit order - 1691234567890-uniquePrefix-L1234
+   * reduce only order - 1691234567890-uniquePrefix-R1234
+   * Take profit order - 1691234567890-uniquePrefix-1234.TP
+   * Stop loss order - 1691234567890-uniquePrefix-1234.SL
+   */
 
   private generateClientOrderId(
     prefix: string,
@@ -995,6 +1104,7 @@ export class OrdersBasket extends BaseObject {
     return amount;
   };
 
+  //TODO check naming getUsdAmount
   getUsdAmount = (contractsAmount: number, executionPrice?: number) => {
     if (!executionPrice) {
       executionPrice = this.close();
@@ -1094,5 +1204,20 @@ export class OrdersBasket extends BaseObject {
         log('Exchange:init', 'Leverage already set', { leverage: this.leverage, symbol: this.symbol });
       }
     }
+  }
+
+  async onTick(): Promise<any> {
+    return { class: 'OrdersBasket' };
+  }
+  private set connectionName(value: string) {
+    this._connectionName = value;
+  }
+
+  get connectionName(): string {
+    return this._connectionName;
+  }
+
+  async getSymbolInfo() {
+    return await symbolInfo(this.symbol);
   }
 }

@@ -6,10 +6,11 @@ import type { BaseObject } from './base-object';
 import type { CandlesBufferService } from '../candles';
 import { Indicators } from '../indicators';
 import { getArgBoolean, getArgNumber } from './base';
+import { BaseScript } from '../script/base-script';
 
 
 class GlobalScope {
-  private _strategy: Script = null;
+  private _strategy: BaseScript = null;
   private _triggers: TriggerService = null;
   private _report: Report = null;
   private _events: EventEmitter = null;

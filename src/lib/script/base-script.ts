@@ -11,11 +11,11 @@ import { CandlesBufferService } from '../candles';
 import { errorContext } from '../utils/errors';
 import { Indicators } from '../indicators';
 
-export class Script extends BaseObject {
+export class BaseScript extends BaseObject  {
   MAX_ORDERS = 10000;
   connectionName: string; //required
   symbols: string[] = []; //required
-  interval: number; // if set  - onTimer will be called every interval instead of onTick
+  interval: number; // if set - onTimer are called every interval instead of onTick
 
   iterator = 0;
 
@@ -29,7 +29,7 @@ export class Script extends BaseObject {
   _testerEndRealTime: number;
 
   isInitialized = false;
-
+  closedOrdersId: Record<string, string> = {};
   constructor(args: GlobalARGS) {
     super(args);
     this._testerStartRealTime = Date.now();
@@ -64,7 +64,7 @@ export class Script extends BaseObject {
     }
 
     if (this.symbols.length === 0) {
-      throw new BaseError('Script::constructor symbols is not defined');
+      throw new BaseError('BaseScript::constructor symbols is not defined');
     }
 
     const idPrefix = 'Global'; //
@@ -82,12 +82,35 @@ export class Script extends BaseObject {
     }
   }
 
+  async onStop() {}
+  async onInit() {}
+
+  //async onBeforeTick() {}
+
+  async onTick(data: Tick) {}
+
+ // async onAfterTick() {}
+
+  async onOrderChange(order: Order) {}
+
+  async onArgsUpdate(args: GlobalARGS) {}
+
+  async onReportAction(action: string, payload: any) {}
+
+  async onTimer() {}
+
+  async onEvent(event: string, data: any) {}
+
+  onError = async (e: any): Promise<never | void> => {
+    throw e;
+  };
+
   protected async init() {
     try {
       let balanceInfo = await getBalance();
       this.balanceTotal = balanceInfo.total.USDT;
       this.balanceFree = balanceInfo.free.USDT;
-      log('Script::init', 'getBalance', balanceInfo, true);
+      log('BaseScript::init', 'getBalance', balanceInfo, true);
     } catch (e) {
       throw errorContext(e, {});
     } finally {
@@ -106,7 +129,7 @@ export class Script extends BaseObject {
       this.isInitialized = true;
       await this.onInit();
     } catch (e) {
-      error('Script::init', e);
+      throw errorContext(e, {});
     } finally {
       this.isInitialized = false;
     }
@@ -114,6 +137,7 @@ export class Script extends BaseObject {
 
   _isTickLocked = false;
   protected async runOnTick(data: Tick) {
+   // log('BaseScript::runOnTick', 'Run onTick', { data, iterator: this.iterator }, true);
     if (this._isTickLocked) {
       return;
     }
@@ -143,7 +167,7 @@ export class Script extends BaseObject {
   forceStop(reason: string) {
     this.isStop = true;
     forceStop();
-    error('Script::forceStop', reason, {});
+    error('BaseScript::forceStop', reason, {});
     throw new BaseError(reason);
   }
 
@@ -164,7 +188,7 @@ export class Script extends BaseObject {
       await this.runOnError(e);
     }
   };
-  closedOrdersId: Record<string, string> = {};
+
   protected runOnOrderChange = async (orders: Order[]) => {
     try {
       for (const order of orders) {
@@ -172,7 +196,7 @@ export class Script extends BaseObject {
           try {
             //TODO (Sometimes binance send closed order twice) investigate why!!!
             if (this.closedOrdersId[order.id]) {
-              warning('Script::runOnOrderChange', 'Closed order came twice', { order }, true);
+              warning('BaseScript::runOnOrderChange', 'Closed order came twice', { order }, true);
               return;
             }
             if (order.status === 'closed') {
@@ -213,9 +237,17 @@ export class Script extends BaseObject {
     }
   };
 
-  onError = async (e: any): Promise<never | void> => {
-    throw e;
-  };
+
+
+  async runOnEvent(event,data: any) {
+    try {
+      await this.onEvent(event, data);
+      await globals.events.emit('onEvent', { event, data });
+    } catch (e) {
+      await this.runOnError(e);
+    }
+  }
+
 
   //TODO delete run method - because it is not used
   protected async run() {
@@ -253,26 +285,4 @@ export class Script extends BaseObject {
     }
   }
 
-  async onReportAction(action: string, payload: any) {}
-
-  async onStop() {}
-
-
-  /**
-   * This method is called when the script is initialized.
-   * In tester not possible open orders, because quotes are not available yet.
-   */
-  async onInit() {}
-
-  async onBeforeTick() {}
-
-  async onTick(data: Tick) {}
-
-  async onAfterTick() {}
-
-  async onOrderChange(order: Order) {}
-
-  async onArgsUpdate(args: GlobalARGS) {}
-
-  async onTimer() {}
 }

@@ -13,7 +13,7 @@ export type CreateOrderTaskParams = CreateTaskBaseParams & AtLeastOne<OrderIdFie
 interface CreateTaskBaseParams {
   name: string;
   args?: any;
-  callback?: (args?: any) => Promise<void>;
+  callback?: (args?: any) => Promise<any>;
   status: 'open' | 'closed' | 'canceled';
   retry?: boolean | number;
   comment?: string;

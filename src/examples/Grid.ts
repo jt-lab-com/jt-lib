@@ -1,8 +1,9 @@
-import { Script } from '../lib/script';
+
 import { StandardReportLayout } from '../lib/report/layouts/standart.report.layout';
 import { GridBasket } from './basket/GridBasket';
 import { globals } from '../lib/core/globals';
 import { currentTime } from '../lib/utils/date-time';
+import { BaseScript } from '../lib/script/base-script';
 
 /*
 Multi-coin grid strategy example.
@@ -21,12 +22,11 @@ Strategy:
 
 After that, we have 2 ways
   a. - Price goes up and we have profit and close round.
-
   b. - Price goes down and we open new orders with gridStepPercent and wait for price to go up again and close round.
 
 */
 
-class Strategy extends Script {
+class Scrypt extends BaseScript {
   static definedArgs = [
     {
       key: 'symbols',
