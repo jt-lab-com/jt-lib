@@ -3,9 +3,8 @@ import { error, log, trace } from '../lib/core/log';
 import { timeCurrent, timeToStrHms } from '../lib/utils/date-time';
 import { getArgNumber } from '../lib/core/base';
 import { OrdersBasket } from '../lib/exchange';
-import { BaseScript } from '../lib/script/base-script';
+import { BaseScript } from '../lib/script';
 import { sleep } from '../lib/utils/misc';
-
 
 /*
 This script is an example of using API calls in the strategy.
@@ -32,7 +31,7 @@ class Script extends BaseScript {
 
   hedgeMode = true;
   /*
-  * Size in USD for market & limit orders.
+   * Size in USD for market & limit orders.
    */
   sizeUsd: any;
   symbol: string;
@@ -42,12 +41,9 @@ class Script extends BaseScript {
 
     this.symbol = this.symbols[0];
     this.sizeUsd = getArgNumber('sizeUsd', 2);
-
   }
 
-
   onInit = async () => {
-
     //Create a new OrdersBasket instance
     this.ob = new OrdersBasket({
       hedgeMode: this.hedgeMode,
@@ -58,22 +54,20 @@ class Script extends BaseScript {
     await this.ob.init();
 
     globals.report.setTitle('Trading API Example');
-    globals.report.createText('info1', `Exchange: ${this.connectionName}, Symbol: ${this.symbol}, Hedge Mode: ${this.hedgeMode}`,{align:'center', variant:'h4'});
+    globals.report.createText(
+      'info1',
+      `Exchange: ${this.connectionName}, Symbol: ${this.symbol}, Hedge Mode: ${this.hedgeMode}`,
+      { align: 'center', variant: 'h4' },
+    );
     await this.createButtons();
 
-
     await globals.report.updateReport();
-
   };
 
   async onOrderChange(order: Order): Promise<void> {
     globals.report.tableUpdate('onOrderChange', { ...order, info: undefined }, 'uid');
     // log('onOrderChange', 'Order Changed ' + order.status, order, true);
   }
-
-
-
-
 
   async onReportAction(action: string, data: any) {
     log('onReportAction', 'action', { action: action, data: data }, true);
@@ -91,13 +85,13 @@ class Script extends BaseScript {
           result = this.ob.price();
           break;
         case 'volume':
-          result =  this.ob.volume();
+          result = this.ob.volume();
           break;
         case 'ask':
           result = { ask: this.ob.ask(), askVolume: this.ob.askVolume() };
           break;
         case 'bid':
-          result =  { bid: this.ob.bid(), bidVolume: this.ob.bidVolume() };
+          result = { bid: this.ob.bid(), bidVolume: this.ob.bidVolume() };
           break;
         case 'getPositions':
           result = await this.ob.getPositions();
@@ -134,13 +128,13 @@ class Script extends BaseScript {
           break;
         }
         case 'modifyOrder': {
-          let amount = this.ob.getContractsAmount(this.sizeUsd);
-          let limitPrice = this.ob.close() * 0.7;
+          const amount = this.ob.getContractsAmount(this.sizeUsd);
+          const limitPrice = this.ob.close() * 0.7;
 
-          await  sleep(1000); // wait for the order to be created
+          await sleep(1000); // wait for the order to be created
 
           const order = await this.ob.buyLimit(amount, limitPrice);
-          result = await this.ob.modifyOrder(order.id, 'limit', 'buy', amount, limitPrice*1.05);
+          result = await this.ob.modifyOrder(order.id, 'limit', 'buy', amount, limitPrice * 1.05);
           break;
         }
         case 'cancelOrder': {
@@ -158,7 +152,7 @@ class Script extends BaseScript {
           result = await getClosedOrders(this.symbol);
           break;
         case 'BuySlTp': {
-          let amount = this.ob.getContractsAmount(this.sizeUsd);
+          const amount = this.ob.getContractsAmount(this.sizeUsd);
           const percent = 0.05; // 1%
           const sl = this.ob.price() * (1 - percent);
           const tp = this.ob.price() * (1 + percent);
@@ -207,7 +201,7 @@ class Script extends BaseScript {
     await globals.report.updateReport();
   }
 
-  async onTick (data) {
+  async onTick(data) {
     globals.report.cardSetValue('Close', this.ob.close());
     globals.report.cardSetValue('Bid', this.ob.bid());
     globals.report.cardSetValue('Ask', this.ob.ask());
@@ -216,8 +210,7 @@ class Script extends BaseScript {
     if (this.iterator % 5 === 0) {
       await globals.report.updateReport();
     }
-
-  };
+  }
 
   onStop = async () => {
     await globals.report.updateReport();
