@@ -1,9 +1,8 @@
-
 import { StandardReportLayout } from '../lib/report/layouts/standart.report.layout';
 import { GridBasket } from './basket/GridBasket';
 import { globals } from '../lib/core/globals';
 import { currentTime } from '../lib/utils/date-time';
-import { BaseScript } from '../lib/script/base-script';
+import { BaseScript } from '../lib/script';
 
 /*
 Multi-coin grid strategy example.
@@ -26,7 +25,7 @@ After that, we have 2 ways
 
 */
 
-class Scrypt extends BaseScript {
+class Script extends BaseScript {
   static definedArgs = [
     {
       key: 'symbols',
@@ -43,8 +42,7 @@ class Scrypt extends BaseScript {
     {
       key: 'minProfitPercent',
       defaultValue: 2,
-    }
-
+    },
   ];
   baskets: Record<string, GridBasket> = {};
   private reportLayout: StandardReportLayout;

@@ -9,7 +9,7 @@ export class RsiBasket extends OrdersBasket {
   usdSize: number = getArgNumber('usdSize', 100);
   tpPercent: number = getArgNumber('tpPercent', 5) / 100;
   slPercent: number = getArgNumber('slPercent', 10) / 100;
-  isPositionOpened: boolean = false;
+  isPositionOpened = false;
 
   async init() {
     await super.init();
@@ -20,22 +20,22 @@ export class RsiBasket extends OrdersBasket {
 
   async onTick() {
     if (this.isPositionOpened) return;
-    let signal = this.signal();
+    const signal = this.signal();
     if (signal === 0) return;
 
     if (signal === 1) {
-      let amount = this.getContractsAmount(this.usdSize);
-      let takeProfit = this.close() * (1 + this.tpPercent);
-      let stopLoss = this.close() * (1 - this.slPercent);
+      const amount = this.getContractsAmount(this.usdSize);
+      const takeProfit = this.close() * (1 + this.tpPercent);
+      const stopLoss = this.close() * (1 - this.slPercent);
 
       await this.buyMarket(amount, takeProfit, stopLoss);
       this.isPositionOpened = true;
     }
 
     if (signal === -1) {
-      let amount = this.getContractsAmount(this.usdSize);
-      let takeProfit = this.close() * (1 - this.tpPercent);
-      let stopLoss = this.close() * (1 + this.slPercent);
+      const amount = this.getContractsAmount(this.usdSize);
+      const takeProfit = this.close() * (1 - this.tpPercent);
+      const stopLoss = this.close() * (1 + this.slPercent);
 
       await this.sellMarket(amount, takeProfit, stopLoss);
       this.isPositionOpened = true;
@@ -49,7 +49,7 @@ export class RsiBasket extends OrdersBasket {
   }
 
   signal() {
-    let rsi = this.rsi14.getValue();
+    const rsi = this.rsi14.getValue();
     if (rsi < 30) return -1;
     if (rsi > 70) return 1;
 
