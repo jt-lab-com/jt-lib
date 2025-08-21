@@ -1,1 +1,1 @@
-export { Script } from './script';
+export { BaseScript } from './base-script';

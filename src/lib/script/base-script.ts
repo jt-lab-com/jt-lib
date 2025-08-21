@@ -11,7 +11,7 @@ import { CandlesBufferService } from '../candles';
 import { errorContext } from '../utils/errors';
 import { Indicators } from '../indicators';
 
-export class BaseScript extends BaseObject  {
+export class BaseScript extends BaseObject {
   MAX_ORDERS = 10000;
   connectionName: string; //required
   symbols: string[] = []; //required
@@ -47,10 +47,10 @@ export class BaseScript extends BaseObject  {
     } else {
       //TODO make symbolsInfo available in constructor
       if (!this.symbols?.length) {
-        let symbol = '';
-        let symbolsLine = getArgString('symbols', '');
+        const symbol = '';
+        const symbolsLine = getArgString('symbols', '');
 
-        let symbols = symbolsLine.split(',');
+        const symbols = symbolsLine.split(',');
         symbols.forEach((symbol) => {
           if (symbol.includes('/')) {
             this.symbols.push(symbol.trim());
@@ -89,7 +89,7 @@ export class BaseScript extends BaseObject  {
 
   async onTick(data: Tick) {}
 
- // async onAfterTick() {}
+  // async onAfterTick() {}
 
   async onOrderChange(order: Order) {}
 
@@ -107,7 +107,7 @@ export class BaseScript extends BaseObject  {
 
   protected async init() {
     try {
-      let balanceInfo = await getBalance();
+      const balanceInfo = await getBalance();
       this.balanceTotal = balanceInfo.total.USDT;
       this.balanceFree = balanceInfo.free.USDT;
       log('BaseScript::init', 'getBalance', balanceInfo, true);
@@ -117,7 +117,7 @@ export class BaseScript extends BaseObject  {
       this.isInitialized = false;
     }
 
-    let initInfo = {
+    const initInfo = {
       balanceTotal: this.balanceTotal,
       balanceFree: this.balanceFree,
       symbols: this.symbols,
@@ -137,7 +137,7 @@ export class BaseScript extends BaseObject  {
 
   _isTickLocked = false;
   protected async runOnTick(data: Tick) {
-   // log('BaseScript::runOnTick', 'Run onTick', { data, iterator: this.iterator }, true);
+    // log('BaseScript::runOnTick', 'Run onTick', { data, iterator: this.iterator }, true);
     if (this._isTickLocked) {
       return;
     }
@@ -237,9 +237,7 @@ export class BaseScript extends BaseObject  {
     }
   };
 
-
-
-  async runOnEvent(event,data: any) {
+  async runOnEvent(event, data: any) {
     try {
       await this.onEvent(event, data);
       await globals.events.emit('onEvent', { event, data });
@@ -247,7 +245,6 @@ export class BaseScript extends BaseObject  {
       await this.runOnError(e);
     }
   }
-
 
   //TODO delete run method - because it is not used
   protected async run() {
@@ -270,8 +267,8 @@ export class BaseScript extends BaseObject  {
     }
     this._testerEndRealTime = Date.now();
     //  if (isTester()) {
-    let min = normalize((this._testerEndRealTime - this._testerStartRealTime) / 1000 / 60, 0);
-    let sec = normalize((this._testerEndRealTime - this._testerStartRealTime) / 1000, 0);
+    const min = normalize((this._testerEndRealTime - this._testerStartRealTime) / 1000 / 60, 0);
+    const sec = normalize((this._testerEndRealTime - this._testerStartRealTime) / 1000, 0);
     log('Script:stop', `Tester spend ${min}:${sec}`, {}, true);
     //}
   }
@@ -284,5 +281,4 @@ export class BaseScript extends BaseObject  {
       await this.runOnError(e);
     }
   }
-
 }

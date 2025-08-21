@@ -10,21 +10,20 @@ import {
 } from './types';
 import { BaseError } from '../core/errors';
 import { TriggerService } from '../events';
-import { debug, error, log, logOnce, trace, warning } from '../core/log';
+import { debug, error, log, logOnce, warning } from '../core/log';
 import { getArgBoolean, getArgNumber, getArgString, uniqueId } from '../core/base';
 import { globals } from '../core/globals';
 import { currentTime, timeToString } from '../utils/date-time';
 import { positionProfit } from './heplers';
 import { isZero, normalize, validateNumbersInObject } from '../utils/numbers';
 import { errorContext } from '../utils/errors';
-import { sleep } from '../utils/misc';
 
 export class OrdersBasket extends BaseObject {
   LEVERAGE_INFO_KEY = 'exchange-leverage-info-';
   readonly triggerService: TriggerService;
   protected readonly symbol: string;
   protected _connectionName: string;
-  protected hedgeMode: boolean = false;
+  protected hedgeMode = false;
   protected readonly triggerType: TriggerType = 'script';
   protected readonly ordersByClientId = new Map<
     string,
@@ -34,7 +33,7 @@ export class OrdersBasket extends BaseObject {
   protected readonly stopOrdersQueue = new Map<string, StopOrderQueueItem>();
 
   protected symbolInfo: SymbolInfo;
-  protected leverage: number = 1;
+  protected leverage = 1;
   protected prefix: string;
   protected maxLeverage: number;
   protected contractSize: number;
@@ -183,12 +182,12 @@ export class OrdersBasket extends BaseObject {
         this.triggerType === 'exchange'
       ) {
         if (triggerOrderType === 'TP') {
-          let slOrderId = order.clientOrderId.replace('.TP', '.SL');
+          const slOrderId = order.clientOrderId.replace('.TP', '.SL');
           await this.cancelOrder(slOrderId);
         }
 
         if (triggerOrderType === 'SL') {
-          let tpOrderId = order.clientOrderId.replace('.SL', '.TP');
+          const tpOrderId = order.clientOrderId.replace('.SL', '.TP');
           await this.cancelOrder(tpOrderId);
         }
       }
@@ -273,7 +272,7 @@ export class OrdersBasket extends BaseObject {
   async beforeOnPnlChange(order: Order): Promise<any> {
     try {
       if (order.status === 'closed') {
-        let pnl = this._updatePosSlot(order);
+        const pnl = this._updatePosSlot(order);
         if (pnl) {
           await this.onPnlChange(pnl, 'pnl');
           await globals.events.emit('onPnlChange', { type: 'pnl', amount: pnl });
@@ -291,12 +290,12 @@ export class OrdersBasket extends BaseObject {
 
   async onPnlChange(amount: number, type: 'fee' | 'pnl' | 'transfer'): Promise<any> {}
 
-  createSlTpByTriggers = async (args: { clientOrderId: string; symbol: string; sl: number; tp: number }) => {
+  async createSlTpByTriggers(args: { clientOrderId: string; symbol: string; sl: number; tp: number }) {
     //  trace('OrdersBasket::creteSlTpByTriggers', 'Creating SL/TP by triggers', args);
-    let { slOrder, tpOrder } = await this.createSlTpOrders(args.clientOrderId, args.sl, args.tp);
-  };
+    const { slOrder, tpOrder } = await this.createSlTpOrders(args.clientOrderId, args.sl, args.tp);
+  }
 
-  cancelSlTpByTriggers = async (args: { taskId?: string; clientOrderId?: string }) => {
+  async cancelSlTpByTriggers(args: { taskId?: string; clientOrderId?: string }) {
     if (!args.clientOrderId) {
       await this.cancelOrder(args.clientOrderId);
     }
@@ -304,7 +303,7 @@ export class OrdersBasket extends BaseObject {
     if (args.taskId) {
       this.triggerService.cancelOrderTask(args.taskId);
     }
-  };
+  }
 
   /**
    * Create order on exchange
@@ -363,7 +362,7 @@ export class OrdersBasket extends BaseObject {
         prefix: this.prefix,
       });
 
-      let taskId = this.triggerService.addTaskByOrder({
+      const taskId = this.triggerService.addTaskByOrder({
         clientOrderId,
         args: { clientOrderId, sl, tp },
         name: 'creteSlTpByTriggers',
@@ -383,7 +382,7 @@ export class OrdersBasket extends BaseObject {
     const triggerPrice = params.triggerPrice || params.stopLossPrice || params.takeProfitPrice;
 
     if (triggerPrice && this.triggerType === 'script') {
-      let ownerClientOrderId = params.ownerClientOrderId as string;
+      const ownerClientOrderId = params.ownerClientOrderId as string;
 
       let triggerOrderType = undefined;
       if (params.takeProfitPrice || params.stopLossPrice) {
@@ -405,7 +404,7 @@ export class OrdersBasket extends BaseObject {
       if (params.takeProfitPrice) taskName = 'executeTakeProfit';
       if (params.triggerPrice) taskName = 'createOrderByTrigger';
 
-      let group = ownerClientOrderId || (params?.triggerGroup as string);
+      const group = ownerClientOrderId || (params?.triggerGroup as string);
       taskId = this.triggerService.addTaskByPrice({
         name: taskName,
         triggerPrice: triggerPrice as number,
@@ -488,7 +487,7 @@ export class OrdersBasket extends BaseObject {
     price: number,
     params: Record<string, unknown>,
   ): Order {
-    let order: Order = {
+    const order: Order = {
       emulated: true,
       id: (params.id as string) ?? uniqueId(8),
       clientOrderId: (params?.clientOrderId as string) ?? '',
@@ -523,7 +522,7 @@ export class OrdersBasket extends BaseObject {
     return order;
   }
   getUserOrderParams(clientOrderId: string): Record<string, number | string | boolean> {
-    let order = this.ordersByClientId.get(clientOrderId);
+    const order = this.ordersByClientId.get(clientOrderId);
     return order?.userParams ?? {};
   }
 
@@ -608,7 +607,7 @@ export class OrdersBasket extends BaseObject {
         error('Exchange:cancelOrder ', 'orderId must be string ', { orderId, orderIdType: typeof orderId });
         return {};
       }
-      let order = await cancelOrder(orderId, this.symbol);
+      const order = await cancelOrder(orderId, this.symbol);
 
       if (!order || !order.id) {
         warning('Exchange:cancelOrder', 'Order not found or already canceled', { orderId, symbol: this.symbol });
@@ -731,9 +730,9 @@ export class OrdersBasket extends BaseObject {
   }
 
   cancelAllOrders = async (): Promise<void> => {
-    let orders = await this.getOpenOrders();
-    for (let order of orders) {
-      let result = await this.cancelOrder(order.id);
+    const orders = await this.getOpenOrders();
+    for (const order of orders) {
+      const result = await this.cancelOrder(order.id);
 
       if (result.status !== 'canceled') {
         error('OrdersBasket::cancelAllOrders', 'Order not canceled', { order });
@@ -833,7 +832,7 @@ export class OrdersBasket extends BaseObject {
   }
 
   async getPositions(isForce = false) {
-    let positions = await getPositions([this.symbol], { forceFetch: isForce });
+    const positions = await getPositions([this.symbol], { forceFetch: isForce });
 
     if (!isTester() && globals.isDebug) {
       logOnce('OrdersBasket::getPositions', this.symbol, { positions, isForce });
@@ -965,14 +964,14 @@ export class OrdersBasket extends BaseObject {
       split.shift();
     }
 
-    let shortClientId = split[2];
+    const shortClientId = split[2];
 
     let triggerOrderType = undefined;
     let ownerClientOrderId = undefined;
     let shortOwnerClientId = undefined;
 
     if (shortClientId) {
-      let splitShortId = shortClientId.split('.');
+      const splitShortId = shortClientId.split('.');
 
       triggerOrderType = splitShortId[1] ?? null;
       shortOwnerClientId = splitShortId[0];
@@ -1023,7 +1022,7 @@ export class OrdersBasket extends BaseObject {
       params['marginMode'] = this.marginMode;
     }
 
-    for (let key in params) {
+    for (const key in params) {
       if (allowedParams[key]) {
         orderParams[key] = params[key];
       } else {
@@ -1051,9 +1050,9 @@ export class OrdersBasket extends BaseObject {
     //TODO: validate orders type only is open -> clear orders with other status
     // getOpenOrders is not working in tester mode, use getOrders and filter by status
     if (isTester()) {
-      let orders = [];
+      const orders = [];
 
-      for (let order of await this.getOrders()) {
+      for (const order of await this.getOrders()) {
         if (order.status === 'open') {
           orders.push(order);
         }
@@ -1074,9 +1073,9 @@ export class OrdersBasket extends BaseObject {
   async getClosedOrders(since = undefined, limit = 100, params: any = undefined) {
     // getClosedOrders is not working in tester mode, use getOrders and filter by status
     if (isTester()) {
-      let orders = [];
+      const orders = [];
 
-      for (let order of await this.getOrders()) {
+      for (const order of await this.getOrders()) {
         if (order.status === 'closed') {
           orders.push(order);
         }
@@ -1099,7 +1098,7 @@ export class OrdersBasket extends BaseObject {
     }
     // contractSize = 10 xrp
     // xrp = 0.5 usd, usdAmount = 5 usd | amount = 5 / 0.5 / 10 = 1
-    let amount = usdAmount / executionPrice / this.contractSize;
+    const amount = usdAmount / executionPrice / this.contractSize;
 
     return amount;
   };
@@ -1159,10 +1158,10 @@ export class OrdersBasket extends BaseObject {
   }
 
   async marketInfoShort(): Promise<MarketInfoShort> {
-    let info = {} as MarketInfoShort;
+    const info = {} as MarketInfoShort;
 
-    let posBuy = await this.getPositionBySide('long');
-    let posSell = await this.getPositionBySide('short');
+    const posBuy = await this.getPositionBySide('long');
+    const posSell = await this.getPositionBySide('short');
 
     info.symbol = this.symbol;
     info.close = this.close();
@@ -1180,8 +1179,8 @@ export class OrdersBasket extends BaseObject {
   private async setLeverage(leverage: number) {
     // --- Set leverage ---
     if (!isTester()) {
-      let levKey = this.LEVERAGE_INFO_KEY + this._connectionName + '-' + this.symbol;
-      let leverageInfo = Number(await globals.storage.get(levKey));
+      const levKey = this.LEVERAGE_INFO_KEY + this._connectionName + '-' + this.symbol;
+      const leverageInfo = Number(await globals.storage.get(levKey));
 
       if (leverageInfo !== this.leverage) {
         try {
