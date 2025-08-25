@@ -4,7 +4,7 @@ import { getArgBoolean } from './base';
 import { BaseError } from './errors';
 
 const LOG_MAX_MESSAGES = 200;
-const MAX_CONSOLE_LOG = 500;
+const MAX_CONSOLE_LOG = 200;
 const IS_DEBUG = getArgBoolean('isDebug', false);
 const IS_STRINGIFY = getArgBoolean('isStringifyLogs', true);
 
@@ -190,8 +190,8 @@ function _updateLog(
     globals.consoleLogCount++;
     if (globals.consoleLogCount > MAX_CONSOLE_LOG) {
       console.error('Too many console.log() calls. Max count = ' + MAX_CONSOLE_LOG);
-      //todo ADD reason argument to forceStop();
-      forceStop();
+
+      globals.strategy.forceStop('Too many console.log() calls. Max count = ' + MAX_CONSOLE_LOG);
     }
   }
 
