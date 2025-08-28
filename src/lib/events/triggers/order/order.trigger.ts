@@ -29,11 +29,12 @@ export class OrderTrigger extends Trigger implements OrderTriggerInterface {
     if (!(owner instanceof BaseObject)) {
       throw new BaseError('OrderTrigger::subscribe() The owner must be an instance of the BaseObject class');
     }
-    if (!owner[handler.name] || typeof owner[handler.name] !== 'function') {
-      throw new BaseError(
-        `OrderTrigger::subscribe() ${handler.name} should be a function of ${owner.constructor.name}`,
-      );
-    }
+
+    // if (!owner[handler.name] || typeof owner[handler.name] !== 'function') {
+    //   throw new BaseError(
+    //     `OrderTrigger::subscribe() handler.name = '${handler.name}' should be a function of ${owner.constructor.name}`,
+    //   );
+    // }
     if (this._registeredHandlers.get(taskName)) {
       throw new BaseError(`OrderTrigger::subscribe() The handler for the task ${taskName} is already registered`, {
         taskName,
@@ -204,7 +205,7 @@ export class OrderTrigger extends Trigger implements OrderTriggerInterface {
     this.inactiveTasks.clear();
   }
 
-  afterRestore() {
+  afterReStore() {
     for (let task of this.getActiveTasks()) {
       if (task.callback) {
         this.cancelTask(task.id);

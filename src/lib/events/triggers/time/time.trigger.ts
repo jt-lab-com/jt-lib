@@ -243,7 +243,7 @@ export class TimeTrigger extends Trigger implements TimeTrigger {
     this.inactiveTasks.clear();
   }
 
-  afterRestore() {
+  afterReStore() {
     for (let task of this.getActiveTasks()) {
       if (task.callback) {
         this.cancelTask(task.id);

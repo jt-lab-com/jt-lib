@@ -52,7 +52,7 @@ export class PriceTrigger extends Trigger implements PriceTriggerInterface {
     }
     if (!owner[handler.name] || typeof owner[handler.name] !== 'function') {
       throw new BaseError(
-        `PriceTrigger::registerHandler() ${handler.name} should be a function of ${owner.constructor.name}`,
+        `PriceTrigger::registerHandler() handler.name = '${handler.name}' should be a function of ${owner.constructor.name}`,
       );
     }
     if (this._registeredHandlers.get(taskName)) {
@@ -377,7 +377,7 @@ export class PriceTrigger extends Trigger implements PriceTriggerInterface {
       .forEach((task) => this.inactiveTasks.delete(task.id));
   }
 
-  beforeStore() {
+  async beforeStore() {
     Array.from(this.upperPriceTasks.entries()).forEach(([taskId, task]) => {
       if (!!task.callback) {
         this.upperPriceTasks.delete(taskId);
@@ -391,7 +391,7 @@ export class PriceTrigger extends Trigger implements PriceTriggerInterface {
     this.inactiveTasks.clear();
   }
 
-  afterRestore() {
+  afterReStore() {
     for (let task of this.getActiveTasks()) {
       if (task.callback) {
         this.cancelTask(task.id);

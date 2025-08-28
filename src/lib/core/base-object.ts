@@ -95,4 +95,8 @@ export class BaseObject {
   }
 
   onError(e: Error, context: any) {}
+
+  afterReStore() {}
+
+  beforeStore() {}
 }

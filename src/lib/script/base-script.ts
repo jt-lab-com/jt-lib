@@ -8,10 +8,9 @@ import { getArgBoolean, getArgString } from '../core/base';
 import { BaseError } from '../core/errors';
 import { normalize } from '../utils/numbers';
 import { CandlesBufferService } from '../candles';
-import { errorContext } from '../utils/errors';
 import { Indicators } from '../indicators';
 
-export class BaseScript extends BaseObject  {
+export class BaseScript extends BaseObject {
   MAX_ORDERS = 10000;
   connectionName: string; //required
   symbols: string[] = []; //required
@@ -89,7 +88,7 @@ export class BaseScript extends BaseObject  {
 
   async onTick(data: Tick) {}
 
- // async onAfterTick() {}
+  // async onAfterTick() {}
 
   async onOrderChange(order: Order) {}
 
@@ -111,8 +110,10 @@ export class BaseScript extends BaseObject  {
       this.balanceTotal = balanceInfo.total.USDT;
       this.balanceFree = balanceInfo.free.USDT;
       log('BaseScript::init', 'getBalance', balanceInfo, true);
+
+      await globals.storage.init();
     } catch (e) {
-      throw errorContext(e, {});
+      throw new BaseError(e, {});
     } finally {
       this.isInitialized = false;
     }
@@ -129,7 +130,8 @@ export class BaseScript extends BaseObject  {
       this.isInitialized = true;
       await this.onInit();
     } catch (e) {
-      throw errorContext(e, {});
+      error(e);
+      throw new BaseError(e, {});
     } finally {
       this.isInitialized = false;
     }
@@ -137,7 +139,7 @@ export class BaseScript extends BaseObject  {
 
   _isTickLocked = false;
   protected async runOnTick(data: Tick) {
-   // log('BaseScript::runOnTick', 'Run onTick', { data, iterator: this.iterator }, true);
+    // log('BaseScript::runOnTick', 'Run onTick', { data, iterator: this.iterator }, true);
     if (this._isTickLocked) {
       return;
     }
@@ -223,9 +225,14 @@ export class BaseScript extends BaseObject  {
 
   protected runOnError = async (e: any) => {
     if (this.isStop) {
+      try {
+        await this.stop();
+      } catch (error) {
+        console.log('BaseScript:runOnError ' + error.message, error.stack);
+      }
       throw e;
     }
-    error(e);
+    error(e, { isStop: this.isStop });
   };
 
   protected runArgsUpdate = async (args: GlobalARGS) => {
@@ -237,9 +244,7 @@ export class BaseScript extends BaseObject  {
     }
   };
 
-
-
-  async runOnEvent(event,data: any) {
+  async runOnEvent(event, data: any) {
     try {
       await this.onEvent(event, data);
       await globals.events.emit('onEvent', { event, data });
@@ -247,7 +252,6 @@ export class BaseScript extends BaseObject  {
       await this.runOnError(e);
     }
   }
-
 
   //TODO delete run method - because it is not used
   protected async run() {
@@ -268,12 +272,11 @@ export class BaseScript extends BaseObject  {
     } catch (e) {
       await this.runOnError(e);
     }
-    this._testerEndRealTime = Date.now();
-    //  if (isTester()) {
-    let min = normalize((this._testerEndRealTime - this._testerStartRealTime) / 1000 / 60, 0);
-    let sec = normalize((this._testerEndRealTime - this._testerStartRealTime) / 1000, 0);
-    log('Script:stop', `Tester spend ${min}:${sec}`, {}, true);
-    //}
+    try {
+      await globals.storage.storeState();
+    } catch (e) {
+      error(e, {});
+    }
   }
 
   protected async runOnReportAction(action: string, payload: any) {
@@ -284,5 +287,4 @@ export class BaseScript extends BaseObject  {
       await this.runOnError(e);
     }
   }
-
 }

@@ -16,7 +16,6 @@ import { globals } from '../core/globals';
 import { currentTime, timeToString } from '../utils/date-time';
 import { positionProfit } from './heplers';
 import { isZero, normalize, validateNumbersInObject } from '../utils/numbers';
-import { errorContext } from '../utils/errors';
 import { sleep } from '../utils/misc';
 
 export class OrdersBasket extends BaseObject {
@@ -26,10 +25,9 @@ export class OrdersBasket extends BaseObject {
   protected _connectionName: string;
   protected hedgeMode: boolean = false;
   protected readonly triggerType: TriggerType = 'script';
-  protected readonly ordersByClientId = new Map<
-    string,
-    Order & { userParams: Record<string, number | string | boolean> }
-  >();
+  protected readonly ordersByClientId = new Map<string, Order>();
+  protected readonly userParamsByClientId = new Map<string, Record<string, number | string | boolean>>();
+
   protected readonly stopOrdersByOwnerShortId = new Map<string, StopOrderData>();
   protected readonly stopOrdersQueue = new Map<string, StopOrderQueueItem>();
 
@@ -119,6 +117,22 @@ export class OrdersBasket extends BaseObject {
       throw new BaseError('OrdersBasket::init', 'Wrong trigger type ' + this.triggerType);
     }
 
+    //get opens orders
+
+    let openOrders = await this.getOpenOrders();
+
+    if (openOrders.length > 0) {
+      for (let order of openOrders) {
+        const { clientOrderId } = order.clientOrderId;
+
+        this.ordersByClientId.set(clientOrderId, order);
+      }
+    }
+
+    //Positions slot initialization
+    this.posSlot['long'] = await this.getPositionBySide('long', true);
+    this.posSlot['short'] = await this.getPositionBySide('short');
+
     log('OrdersBasket::init', '', {
       symbol: this.symbol,
       triggerType: this.triggerType + '',
@@ -128,15 +142,11 @@ export class OrdersBasket extends BaseObject {
       leverage: this.leverage,
       maxLeverage: this.maxLeverage,
       contractSize: this.contractSize,
-      minContractQuoted: this._minContractQuoted,
-      minContractBase: this._minContractBase,
+      _minContractQuoted: this._minContractQuoted,
+      _minContractBase: this._minContractBase,
       minContractStep: this.minContractStep,
+      loadedOpenOrders: openOrders.length,
     });
-
-    //Positions slot initialization
-
-    this.posSlot['long'] = await this.getPositionBySide('long', true);
-    this.posSlot['short'] = await this.getPositionBySide('short');
   }
   private async beforeOnTick() {
     return await this.onTick();
@@ -170,13 +180,11 @@ export class OrdersBasket extends BaseObject {
       order.clientOrderId,
     );
 
-    if (prefix !== this.prefix)
-      return { status: 'not processed', orderPrefix: prefix, currentPrefix: this.prefix, order };
+    //TODO filtering by prefix??
+    // if (prefix !== this.prefix)
+    //   return { status: 'not processed', orderPrefix: prefix, currentPrefix: this.prefix, order };
 
     try {
-      this.ordersByClientId.set(order.clientOrderId, { ...order, userParams: {} });
-      // const stopOrders = this.stopOrdersByOwnerShortId.get(ownerClientOrderId);
-
       if (
         (triggerOrderType === 'TP' || triggerOrderType === 'SL') &&
         order.status === 'closed' &&
@@ -212,7 +220,7 @@ export class OrdersBasket extends BaseObject {
     short: this.emulatePosition('short'),
   };
 
-  private _updatePosSlot(order: Order): number {
+  private async _updatePosSlot(order: Order): Promise<number> {
     if (order.status !== 'closed') {
       return 0;
     }
@@ -227,42 +235,50 @@ export class OrdersBasket extends BaseObject {
 
     if (!position.side) position.side = side;
 
+    //TODO investigate why order.price is 0 on market orders in some exchanges
     let orderPrice = isTester() ? order.price : order.average;
 
     if (isZero(orderPrice)) orderPrice = this.close();
     let pnl = 0;
-    //TODO: check  order.amount or order.filled
+
+    let amountChange = order.amount;
+    let prevOrder = this.ordersByClientId.get(order.clientOrderId);
+    if (prevOrder && !isZero(prevOrder.filled)) {
+      amountChange = order.filled - prevOrder.filled;
+    }
+
     if (isReduce) {
-      pnl = positionProfit(side, position.entryPrice, orderPrice, order.amount, this.contractSize);
+      pnl = positionProfit(side, position.entryPrice, orderPrice, amountChange, this.contractSize);
       position.profit += pnl;
     }
 
     if (!isReduce) {
       position.entryPrice =
-        (position.contracts * position.entryPrice + order.amount * orderPrice) / (position.contracts + order.amount);
-      position.contracts += order.amount;
+        (position.contracts * position.entryPrice + amountChange * orderPrice) / (position.contracts + amountChange);
+      position.contracts += amountChange;
     } else {
-      if (position.contracts - order.amount === 0) {
+      if (position.contracts - amountChange === 0) {
         position.entryPrice = 0;
       }
-      position.contracts -= order.amount;
+      position.contracts -= amountChange;
     }
 
     position.contracts = isZero(position.contracts) ? 0 : position.contracts;
     position.notional = this.getUsdAmount(position.contracts, position.entryPrice);
-    position.unrealizedPnl = positionProfit(
-      side,
-      position.entryPrice,
-      this.close(),
-      position.contracts,
-      this.contractSize,
-    );
 
     if (position.contracts < 0) {
-      throw new BaseError('OrderBasket::_updatePosSlot posSlot.size < 0', { order, pos: this.posSlot });
+      throw new BaseError('OrderBasket::_updatePosSlot posSlot.size < 0', {
+        order,
+        posSlot: this.posSlot,
+        positions: await this.getPositions(),
+      });
     }
     if (position.contracts > 0 && position.entryPrice <= 0) {
-      throw new BaseError('OrderBasket::_updatePosSlot posSlot.entryPrice <= 0', { order, pos: this.posSlot });
+      throw new BaseError('OrderBasket::_updatePosSlot posSlot.entryPrice <= 0', {
+        order,
+        posSlot: this.posSlot,
+        positions: await this.getPositions(),
+      });
     }
 
     this.posSlot[posSide] = position;
@@ -273,15 +289,15 @@ export class OrdersBasket extends BaseObject {
   async beforeOnPnlChange(order: Order): Promise<any> {
     try {
       if (order.status === 'closed') {
-        let pnl = this._updatePosSlot(order);
+        let pnl = await this._updatePosSlot(order);
         if (pnl) {
           await this.onPnlChange(pnl, 'pnl');
-          await globals.events.emit('onPnlChange', { type: 'pnl', amount: pnl });
+          await globals.events.emit('onPnlChange', { type: 'pnl', amount: pnl, symbol: this.symbol });
         }
 
         if (order.fee?.cost) {
           await this.onPnlChange(order.fee.cost, 'fee');
-          await globals.events.emit('onPnlChange', { type: 'fee', amount: order.fee.cost });
+          await globals.events.emit('onPnlChange', { type: 'fee', amount: order.fee.cost, symbol: this.symbol });
         }
       }
     } catch (e) {
@@ -314,6 +330,9 @@ export class OrdersBasket extends BaseObject {
    * @param price -  order price
    * @param params - if params['sl'] or params['tp'] set, stop orders will be created automatically by this order.
    * @returns {Promise<Order>}
+   *
+
+   *
    */
   async createOrder(
     type: OrderType,
@@ -347,6 +366,7 @@ export class OrdersBasket extends BaseObject {
       !!params['reduceOnly'] ?? false,
       params['ownerClientOrderId'] as string,
       params['triggerOrderType'] as string,
+      params['postfix'] as string,
     );
 
     params.clientOrderId = clientOrderId;
@@ -455,7 +475,9 @@ export class OrdersBasket extends BaseObject {
       });
     }
 
-    this.ordersByClientId.set(clientOrderId, { ...order, userParams });
+    this.ordersByClientId.set(clientOrderId, order);
+    this.userParamsByClientId.set(clientOrderId, userParams);
+
     if (!order.id) {
       error('OrdersBasket::createOrder', 'Order not created', {
         marketInfo: await this.marketInfoShort(),
@@ -522,9 +544,9 @@ export class OrdersBasket extends BaseObject {
 
     return order;
   }
-  getUserOrderParams(clientOrderId: string): Record<string, number | string | boolean> {
-    let order = this.ordersByClientId.get(clientOrderId);
-    return order?.userParams ?? {};
+  getOrderUserParams(clientOrderId: string): Record<string, number | string | boolean> {
+    let userParams = this.userParamsByClientId.get(clientOrderId);
+    return userParams ?? {};
   }
 
   setPrefix(prefix?: string): void {
@@ -584,12 +606,6 @@ export class OrdersBasket extends BaseObject {
 
     try {
       const order = await modifyOrder(orderId, this.symbol, type, side, amount, price);
-
-      log('OrdersBasket::modifyOrder', 'Order modified', {
-        args,
-        order,
-        before: this.ordersByClientId.get(orderId) ?? null,
-      });
 
       return order;
     } catch (e) {
@@ -922,7 +938,9 @@ export class OrdersBasket extends BaseObject {
     isReduce = false,
     ownerClientOrderId?: string,
     triggerOrderType?: string,
+    postfix: string = null,
   ) {
+    //TODO check '-' '.' in params
     let idPrefix = type === 'market' ? 'M' : 'L';
     if (isReduce && !ownerClientOrderId) {
       idPrefix = 'R';
@@ -943,6 +961,7 @@ export class OrdersBasket extends BaseObject {
       }
     }
 
+    if (postfix) id = id + '-' + postfix;
     if (this._connectionName === 'gateio') id = `t-${id}`;
 
     return id;
@@ -957,6 +976,7 @@ export class OrdersBasket extends BaseObject {
         ownerClientOrderId: null,
         triggerOrderType: null,
         clientOrderId: null,
+        postfix: null,
       };
     }
     const split = clientOrderId.split('-');
@@ -986,6 +1006,7 @@ export class OrdersBasket extends BaseObject {
       ownerClientOrderId,
       triggerOrderType,
       clientOrderId: clientOrderId,
+      postfix: split[3] ?? null,
     };
   }
 
@@ -1067,7 +1088,7 @@ export class OrdersBasket extends BaseObject {
 
       return await getOpenOrders(this.symbol, since, limit, params);
     } catch (e) {
-      throw errorContext(e, await this.marketInfoShort());
+      throw new BaseError(e, await this.marketInfoShort());
     }
   }
 
@@ -1088,7 +1109,7 @@ export class OrdersBasket extends BaseObject {
       since = since ?? currentTime() - 30 * 24 * 60 * 60 * 1000; // 7 days by default
       return await getClosedOrders(this.symbol, since, limit, params);
     } catch (e) {
-      throw errorContext(e, await this.marketInfoShort());
+      throw new BaseError(e, await this.marketInfoShort());
     }
   }
 
@@ -1115,6 +1136,8 @@ export class OrdersBasket extends BaseObject {
   };
 
   ask() {
+    //TODO fix ask bid in tester
+    if (isTester()) return this.close();
     return ask(this.symbol)?.[0];
   }
 
@@ -1123,6 +1146,7 @@ export class OrdersBasket extends BaseObject {
   }
 
   bid() {
+    if (isTester()) return this.close();
     return bid(this.symbol)?.[0];
   }
 

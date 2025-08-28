@@ -124,24 +124,24 @@ export const isBetween = (number: number, min: number, max: number): boolean => 
 };
 
 /**
- * Calculate the percentage difference between two numbers
- * @param a The first number
- * @param b The second number
+ * Calculate the percentage difference from a to b
+ * @param a The base number (what we compare from)
+ * @param b The compared number (what we compare to)
  * @param isAbs Whether to return the absolute value of the percentage difference
- * @returns {number} The percentage  form a to b
- * @example percentDifference(100, 90) // (100 - 90) / 100 * 100 = 10
- * @example percentDifference(90,100) // (90 - 100) / 90 * 100 = -11.11
+ * @returns {number} Percentage difference of b relative to a
+ * @example percentDifference(100, 90) // (90 - 100) / 100 * 100 = -10
+ * @example percentDifference(100,110) // (110 - 100) / 100 * 100 = 10
  */
 export const percentDifference = (a: number, b: number, isAbs = false): number => {
   if (isNaN(a) || isNaN(b)) {
-    throw new BaseError('percentDifference: at least one of argument is NaN', { a, b });
+    throw new BaseError('percentDifference: at least one of arguments is NaN', { a, b });
   }
 
-  let result = ((a - b) / a) * 100;
+  const result = ((b - a) / a) * 100;
   return isAbs ? Math.abs(result) : result;
 };
 
-export function round (number: number, digits = 2): number {
+export function round(number: number, digits = 2): number {
   if (isNaN(number) || isNaN(digits)) {
     throw new BaseError('round: at least one of argument is NaN', { number, digits });
   }

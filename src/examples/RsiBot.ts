@@ -1,6 +1,5 @@
-
 import { getArgNumber } from '../lib/core/base';
-import { RsiBasket } from './basket/RsiBasket';
+import { RsiBasket } from './baskets/RsiBasket';
 import { StandardReportLayout } from '../lib/report/layouts/standart.report.layout';
 import { BaseScript } from '../lib/script/base-script';
 

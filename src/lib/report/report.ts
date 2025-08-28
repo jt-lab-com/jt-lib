@@ -3,12 +3,13 @@ import { ChartType, ReportChart, ReportChartOptions } from './widgets/report-cha
 import { ReportCard, ReportCardParams } from './widgets/report-card';
 import { ReportActionButton } from './widgets/report-action-button';
 import { ReportText, TextOptions } from './widgets/report-text';
-import { error, getLogs, log, logOnce, warningOnce } from '../core/log';
+import { error, getLogs, log, logOnce, warning, warningOnce } from '../core/log';
 import { BaseObject } from '../core/base-object';
 import { AggType, ExtendedReportChartOptions } from './types';
 import { BaseError } from '../core/errors';
 
 import { getArgBoolean, getArgNumber } from '../core/base';
+import { validateNumbersInObject } from '../utils/numbers';
 
 /**
  * Report - provide functionality for create report of trading strategy. Report can be viewed in web interface.
@@ -64,7 +65,8 @@ export class Report extends BaseObject {
     if (!index && this._layoutIndexes[key]) {
       return;
     }
-    if (!index) {
+
+    if (typeof index == 'number') {
       index = this._layoutIterator = this._layoutIterator + 100;
     }
 
@@ -225,7 +227,7 @@ export class Report extends BaseObject {
           data: opResults,
         });
 
-        if (getArgBoolean('isMultiSymbols', false)) {
+        if (getArgNumber('testerMultiSymbols', 0) > 1 && getArgBoolean('withOptimizer', false) === false) {
           reportData.blocks.push(await this.fullReportChart.prepareDataToFullReport());
         }
         // reportData.blocks.push({
@@ -316,10 +318,16 @@ export class Report extends BaseObject {
     return undefined;
   }
 
-  createActionButton(title: string, action: string, value: string, layoutIndex: number = undefined) {
+  createActionButton(
+    title: string,
+    action: string,
+    value: string,
+    callback: (args?: { action?: string; value?: string }) => Promise<void> = undefined,
+    layoutIndex: number = undefined,
+  ) {
     if (this.actionButtons[title]) return;
 
-    this.actionButtons[title] = new ReportActionButton(title, action, value);
+    this.actionButtons[title] = new ReportActionButton(title, action, value, callback);
 
     if (this.isSetLayoutIndexByDefault) {
       this.setLayoutIndex('actionButton', title, layoutIndex);
@@ -497,7 +505,12 @@ export class Report extends BaseObject {
     this.deleteLayoutIndex('text', textName);
   }
 
+  _lastUpdated = 0;
   async updateReport(args = {}) {
+    if (this._lastUpdated && Date.now() - this._lastUpdated < 9000) {
+      this._lastUpdated = Date.now();
+      warning('Report::updateReport', 'Report updated too often, ignoring', { lastUpdated: this._lastUpdated });
+    }
     try {
       this.lastTimeUpdate = Date.now();
 
@@ -595,8 +608,6 @@ export class Report extends BaseObject {
         });
       }
 
-
-
       let logs = getLogs('error');
 
       if (logs.length > 0) {
@@ -641,7 +652,6 @@ export class Report extends BaseObject {
           data: logs.slice(0, 200),
         });
       }
-
 
       //Multi-symbols report chart for full report
       if (getArgNumber('testerMultiSymbols', 0) > 1 && getArgBoolean('withOptimizer', false) === false) {

@@ -1,5 +1,6 @@
 import { BaseIndicator } from './base-indicator';
 import { CandlesBuffer } from '../candles';
+import { trace } from '../core/log';
 
 interface SimpleMovingAverageIndicatorOptions {
   symbol: string;
@@ -19,11 +20,17 @@ export class SimpleMovingAverageIndicator extends BaseIndicator {
     this.period = options.period;
   }
 
-  protected onCalculate() {
+  protected onCalculate(): any {
+    let result = {};
     const candles = this.candlesBuffer.getCandles();
 
     if (this.lastTimeUpdated >= this.candlesBuffer.getLastTimeUpdated()) return;
-    if (candles.length < this.period) return;
+    // return; {
+    //   msg: 'No new data to calculate',
+    //   lastTimeUpdated: this.lastTimeUpdated,
+    //   candlesBufferLastTimeUpdated: this.candlesBuffer.getLastTimeUpdated(),
+    // };
+    if (candles.length < this.period) return; // { msg: 'Not enough candles to calculate' };
 
     if (this.lastIndex === 0) {
       this.firstValue = candles[0].close;
@@ -47,13 +54,13 @@ export class SimpleMovingAverageIndicator extends BaseIndicator {
       this.lastTimeUpdated = candles[i].timestamp;
       this.lastIndex = i;
     }
+
+    // return { sum: this.sum, lastIndex: this.lastIndex, period: this.period };
   }
 
   getIndicatorValues() {
-    if (!this.buffer.length) {
-      this.onCalculate();
-    }
-
+    let r = this.onCalculate();
+    trace('SMA:getIndicatorValues', 'onCalculate', r, true);
     return this.buffer;
   }
 

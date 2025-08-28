@@ -15,6 +15,7 @@ class Statistics extends BaseObject {
     this.timeStart = currentTime();
 
     globals.events.subscribe('onOrderChange', this.onOrderChange, this);
+
     globals.events.subscribe('onTick', this.dataCollector, this);
   }
 

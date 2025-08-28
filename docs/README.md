@@ -45,7 +45,7 @@ ___
   - [BaseObject](new/base-object.md)
   - [Script](new/extended-script.md)
   - [EventEmitter](event-emitter.md)
-  - [Exchange](exchange.md)
+  - [OrderBasket (Exchange)](exchange.md)
   - [TriggerService](trigger-service.md)
   - [Report](report.md)
  
