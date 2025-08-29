@@ -343,7 +343,7 @@ export class OrdersBasket extends BaseObject {
   ): Promise<Order> {
     const args = { type, side, amount, price, params };
 
-    if (!this.isInit) throw new BaseError('OrdersBasket::createOrder - exchange not initialized', args);
+    if (!this.isInit) throw new BaseError('OrdersBasket::createOrder - OrdersBasket is not initialized', args);
     if (validateNumbersInObject({ amount, price }) === false)
       throw new BaseError('OrdersBasket::createOrder - wrong amount or price', args);
     if (amount <= 0) throw new BaseError('OrdersBasket::createOrder amount must be > 0', args);
@@ -1019,7 +1019,9 @@ export class OrdersBasket extends BaseObject {
     const userParams = {};
 
     const allowedParams = {
-      positionSide: this.hedgeMode && this._connectionName.toLowerCase().includes('binance'),
+      positionSide:
+        (this.hedgeMode && this._connectionName.toLowerCase().includes('binance')) ||
+        this._connectionName.includes('mock'),
       positionIdx: this._connectionName.toLowerCase().includes('bybit') && this.hedgeMode,
       timeInForce: true,
       leverage: true,
