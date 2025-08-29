@@ -2,7 +2,6 @@ import { OrdersBasket } from '../../lib/exchange';
 import { getArgNumber } from '../../lib/core/base';
 import { percentDifference } from '../../lib/utils/numbers';
 
-
 /*
 
  */
@@ -20,13 +19,10 @@ export class GridBasket extends OrdersBasket {
 
       //if no position, that means new round is starting
       if ((await this.getPositionBySide('long')).contracts === 0) {
-       await this.newRound();
+        await this.newRound();
       }
-
-
     }
   }
-
 
   async newRound() {
     await this.buyMarket(this.getContractsAmount(this.usdSize));
@@ -39,17 +35,15 @@ export class GridBasket extends OrdersBasket {
     //clear all limits orders
     await this.cancelAllOrders();
 
-
     // start new round
     await this.newRound();
-
-  }
+  };
 
   async onTick() {
     let position = await this.getPositionBySide('long');
 
     // check fix profit condition
-    if (position.entryPrice && percentDifference(this.close(), position.entryPrice) > this.minProfitPercent) {
+    if (position.entryPrice && percentDifference(position.entryPrice, this.close()) > this.minProfitPercent) {
       // trace('GribBasket:onTick', 'Close position', {
       //   position,
       //   close: this.close(),
@@ -73,11 +67,8 @@ export class GridBasket extends OrdersBasket {
     let triggerPrice = this.close() * (1 - this.gridStepPercent / 100);
 
     let position = await this.getPositionBySide('long');
-    let amount = position.contracts ;
+    let amount = position.contracts;
 
     let order = await this.buyLimit(amount, triggerPrice);
   }
-
-
-
 }

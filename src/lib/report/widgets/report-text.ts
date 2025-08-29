@@ -1,4 +1,5 @@
 import { ReportWidget } from './report-widget';
+import { warning } from '../../core/log';
 
 type TextVariant = 'body1' | 'body2' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'subtitle1' | 'subtitle2' | 'caption';
 type TextAlignment = 'left' | 'center' | 'right';
@@ -12,6 +13,8 @@ export interface TextOptions {
 export class ReportText extends ReportWidget {
   constructor(private text: string, private variant?: TextVariant, private align?: TextAlignment) {
     super();
+
+    //warning('ReportText::constructor','test');
   }
 
   updateOptions(options: TextOptions) {
@@ -24,6 +27,17 @@ export class ReportText extends ReportWidget {
     this.text = text;
   }
 
+  static getBlock(text: string, variant?: TextVariant, align?: TextAlignment): TextReportBlock {
+    return {
+      type: 'text',
+      isVisible: true,
+      data: {
+        value: text,
+        variant: variant ?? 'body2',
+        align: align ?? 'left',
+      },
+    };
+  }
   prepareDataToReport(): TextReportBlock {
     return {
       type: 'text',

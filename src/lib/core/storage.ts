@@ -50,6 +50,7 @@ export class Storage extends BaseObject {
   }
 
   async init() {
+    if (isTester()) return;
     await this.loadState();
   }
 
@@ -144,6 +145,8 @@ export class Storage extends BaseObject {
     return state;
   }
   async storeState() {
+    if (isTester()) return false;
+
     this.statePropsInfoLv1 = [];
     const key = this.stateKey;
 

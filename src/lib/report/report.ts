@@ -522,11 +522,13 @@ export class Report extends BaseObject {
       };
 
       if (this.title) {
-        this._reportData.blocks.push(new ReportText(this.title, 'h1', 'center').prepareDataToReport());
+        // this._reportData.blocks.push(new ReportText(this.title, 'h1', 'center').prepareDataToReport());
+        this._reportData.blocks.push(ReportText.getBlock(this.title, 'h1', 'center'));
       }
 
       if (this.description) {
-        this._reportData.blocks.push(new ReportText(this.description, 'subtitle1', 'center').prepareDataToReport());
+        //this._reportData.blocks.push(new ReportText(this.description, 'subtitle1', 'center').prepareDataToReport());
+        this._reportData.blocks.push(ReportText.getBlock(this.description, 'subtitle1', 'center'));
       }
 
       //----------------TEXTS

@@ -43,6 +43,7 @@ export class OrdersBasket extends BaseObject {
   private nextOrderId = 0;
 
   isInit = false;
+  private isGetPositionsForced: boolean;
 
   constructor(params: ExchangeParams) {
     super(params);
@@ -453,6 +454,9 @@ export class OrdersBasket extends BaseObject {
 
     try {
       order = await createOrder(this.symbol, type, side, amount, price, orderParams);
+      // After creating the order, we force an update of the positions to ensure accuracy.
+      // Because positions may not be updated by websocket
+      this.isGetPositionsForced = true;
     } catch (e) {
       e.message = 'ExchangeAPI:: ' + e.message;
       throw new BaseError(e, {
@@ -849,6 +853,10 @@ export class OrdersBasket extends BaseObject {
   }
 
   async getPositions(isForce = false) {
+    if (this.isGetPositionsForced) {
+      isForce = true;
+      this.isGetPositionsForced = false;
+    }
     let positions = await getPositions([this.symbol], { forceFetch: isForce });
 
     if (!isTester() && globals.isDebug) {
