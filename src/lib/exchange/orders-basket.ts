@@ -191,15 +191,7 @@ export class OrdersBasket extends BaseObject {
         order.status === 'closed' &&
         this.triggerType === 'exchange'
       ) {
-        if (triggerOrderType === 'TP') {
-          let slOrderId = order.clientOrderId.replace('.TP', '.SL');
-          await this.cancelOrder(slOrderId);
-        }
-
-        if (triggerOrderType === 'SL') {
-          let tpOrderId = order.clientOrderId.replace('.SL', '.TP');
-          await this.cancelOrder(tpOrderId);
-        }
+        await this._cancelSecondSlTp(order.clientOrderId);
       }
     } catch (e) {
       error(e, { order });
@@ -210,6 +202,26 @@ export class OrdersBasket extends BaseObject {
     // await this.getPositions(true);
 
     return await this.onOrderChange(order);
+  }
+
+  private async _cancelSecondSlTp(orderId: string) {
+    let oppositeId: string;
+
+    if (orderId.includes('.TP')) {
+      oppositeId = orderId.replace('.TP', '.SL');
+    } else if (orderId.includes('.SL')) {
+      oppositeId = orderId.replace('.SL', '.TP');
+    } else {
+      throw new BaseError('OrdersBasket::_cancelSecondSlTp wrong orderId format', { orderId });
+    }
+
+    let idToCancel = this.ordersByClientId.get(oppositeId)?.id;
+
+    if (orderId) {
+      await this.cancelOrder(idToCancel);
+    } else {
+      warning('OrdersBasket::_cancelSecondSlTp', 'Opposite order not found', { oppositeId });
+    }
   }
 
   async onOrderChange(order: Order): Promise<any> {
@@ -293,12 +305,12 @@ export class OrdersBasket extends BaseObject {
         let pnl = await this._updatePosSlot(order);
         if (pnl) {
           await this.onPnlChange(pnl, 'pnl');
-          await globals.events.emit('onPnlChange', { type: 'pnl', amount: pnl, symbol: this.symbol });
+          await globals.events.emit('onPnlChange', { type: 'pnl', amount: pnl, symbol: this.symbol, order });
         }
 
         if (order.fee?.cost) {
           await this.onPnlChange(order.fee.cost, 'fee');
-          await globals.events.emit('onPnlChange', { type: 'fee', amount: order.fee.cost, symbol: this.symbol });
+          await globals.events.emit('onPnlChange', { type: 'fee', amount: order.fee.cost, symbol: this.symbol, order });
         }
       }
     } catch (e) {
@@ -389,6 +401,7 @@ export class OrdersBasket extends BaseObject {
         args: { clientOrderId, sl, tp },
         name: 'creteSlTpByTriggers',
         status: 'closed',
+        canReStore: true,
       });
 
       this.triggerService.addTaskByOrder({
@@ -396,6 +409,7 @@ export class OrdersBasket extends BaseObject {
         args: { taskId },
         name: 'cancelSlTpByTriggers',
         status: 'canceled',
+        canReStore: true,
       });
 
       log('OrdersBasket::createOrder', 'Stop orders params saved', this.stopOrdersQueue.get(clientOrderId));

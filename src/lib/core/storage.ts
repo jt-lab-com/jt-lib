@@ -8,6 +8,7 @@ type CacheObjectInfo = {
   className: string;
   props: string[];
   obj: object;
+  objId: string;
 };
 
 export class Storage extends BaseObject {
@@ -36,9 +37,11 @@ export class Storage extends BaseObject {
     }
   }
 
-  addObject(key, obj: object, props = []) {
+  addObject(key, obj: BaseObject | object, props = []) {
+    const objId = obj['id'] || null;
     let info: CacheObjectInfo = {
       key,
+      objId,
       className: obj?.constructor?.name,
       props,
       obj,
@@ -46,7 +49,16 @@ export class Storage extends BaseObject {
 
     this.objects[key] = info;
 
+    log('Storage:addObject', 'Object added', { key, objId, props });
     if (this.state[key]) this.reStoreState(key, obj);
+  }
+
+  removeObject(key) {
+    let info = this.objects[key];
+    info.obj = undefined;
+    delete this.objects[key];
+
+    log('Storage:removeObject', 'Object removed', { key, info });
   }
 
   async init() {
@@ -190,14 +202,18 @@ export class Storage extends BaseObject {
 
   iterator = 0;
   propName = '';
-  restoredPropsLevel1 = [];
+  restoredPropsLevel1 = {};
   ignoredPropsLevel1 = [];
   restoredPropsLevel2 = [];
   applyStep = 0;
   private applyState(state: StateInfo, obj: object, i = 0) {
+    if (i == 0) this.restoredPropsLevel1 = {};
     let context = {};
 
     this.iterator++;
+    if (this.restoredPropsLevel1['l' + i] === undefined) this.restoredPropsLevel1['l' + i] = [];
+    const propsInfo = this.restoredPropsLevel1['l' + i];
+
     i++;
     let className;
 
@@ -235,7 +251,7 @@ export class Storage extends BaseObject {
         this.applyStep = 0;
         if (propName.charAt(0) === '_') {
           if (i === 1) {
-            this.restoredPropsLevel1.push(obj.constructor.name + '.' + propName + ' - IGNORED!');
+            propsInfo.push(obj.constructor.name + '.' + propName + ' - IGNORED!');
           }
           continue;
         }
@@ -260,21 +276,14 @@ export class Storage extends BaseObject {
             }
           }
           obj[propName] = this.applyState(objProps[propName], obj[propName], i);
-          // this.debug('Storage::applyState', 'class = ' + className + '  - FILED', { propName });
-
-          this.callAfterRestore(obj[propName]);
         } else {
           obj[propName] = objProps[propName]; //i = 9
         }
 
-        if (i === 1) {
-          if (obj[propName]) {
-            this.restoredPropsLevel1.push(
-              obj.constructor.name + '.' + propName + ': ' + obj[propName].constructor.name,
-            );
-          } else {
-            this.restoredPropsLevel1.push(obj.constructor.name + '.' + propName + ': ' + obj[propName]);
-          }
+        if (obj[propName]) {
+          propsInfo.push(`(${i}) ` + obj.constructor.name + '.' + propName + ': ' + obj[propName].constructor.name);
+        } else {
+          propsInfo.push(obj.constructor.name + '.' + propName + ': ' + obj[propName]);
         }
       }
     } catch (e) {
@@ -291,11 +300,14 @@ export class Storage extends BaseObject {
 
       throw new BaseError(e, { context });
     }
+
+    this.callAfterRestore(obj);
     return obj;
   }
 
   callAfterRestore(obj: object) {
     if (typeof obj['afterReStore'] === 'function') {
+      //log('Storage::callAfterRestore', '', { class: obj.constructor.name }, true);
       try {
         obj['afterReStore']();
       } catch (e) {

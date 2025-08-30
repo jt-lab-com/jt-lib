@@ -12,6 +12,7 @@ export interface CreateTimeTaskParams {
   retry?: boolean | number;
   interval?: number;
   comment?: string;
+  canReStore?: boolean;
 }
 
 export interface TimeTriggerTask extends TriggerTask {

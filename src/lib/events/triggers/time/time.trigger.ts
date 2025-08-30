@@ -1,6 +1,6 @@
 import { globals } from '../../../core/globals';
 import { Trigger } from '../trigger';
-import { error, log, warning } from '../../../core/log';
+import { error, log, logOnce, warning } from '../../../core/log';
 import { currentTime, currentTimeString, timeToString } from '../../../utils/date-time';
 import { CreateTimeTaskParams, TimeTriggerTask } from './types';
 import { BaseObject } from '../../../core/base-object';
@@ -12,13 +12,18 @@ const MAX_INACTIVE_TASKS = 100;
 
 export class TimeTrigger extends Trigger implements TimeTrigger {
   private readonly _registeredHandlers = new Map<string, TriggerHandler>();
-  private readonly activeTasks = new Map<string, TimeTriggerTask>();
-  private readonly inactiveTasks = new Map<string, TimeTriggerTask>();
+  private readonly _activeTasks = new Map<string, TimeTriggerTask>();
+  private readonly _inactiveTasks = new Map<string, TimeTriggerTask>();
 
   private _eventListenerId: string | null = null;
-  private nextId: number = 1;
+  private _nextId = 1;
 
-  private minTriggerTime: number;
+  storageTasks: TimeTriggerTask[] = [];
+  private _minTriggerTime: number;
+
+  constructor(args: any = {}) {
+    super(args);
+  }
 
   registerHandler(taskName: string, handler: Function, owner: BaseObject) {
     if (typeof handler !== 'function') {
@@ -51,26 +56,23 @@ export class TimeTrigger extends Trigger implements TimeTrigger {
     const { triggerTime } = params;
 
     if (!validateNumbersInObject({ triggerTime: triggerTime })) {
-      error(TimeTrigger.name, 'Error adding a task. The trigger time must be a number', {
-        args: arguments,
-      });
       return null;
     }
 
     if (triggerTime <= currentTime()) {
       warning(TimeTrigger.name, 'triggerTime less than current time This task will be executed immediately', {
-        args: arguments,
+        params,
         msDiff: currentTime() - triggerTime,
         triggerTime: timeToString(triggerTime),
         currentTime: timeToString(currentTime()),
       });
     }
 
-    const id = `time#${this.nextId++}`;
+    const id = `time#${this._nextId++}`;
 
-    this.minTriggerTime = this.minTriggerTime ? Math.min(triggerTime, this.minTriggerTime) : triggerTime;
+    this._minTriggerTime = this._minTriggerTime ? Math.min(triggerTime, this._minTriggerTime) : triggerTime;
 
-    this.activeTasks.set(id, {
+    this._activeTasks.set(id, {
       ...params,
       id,
       type: 'time',
@@ -87,35 +89,37 @@ export class TimeTrigger extends Trigger implements TimeTrigger {
       this._eventListenerId = globals.events.subscribe('onTick', this.onTick, this);
     }
 
+    if (params?.canReStore) {
+      this.updateStorageTasks();
+    }
     log('TimeTrigger::addTask', 'New task registered', { task: params });
 
     return id;
   }
 
   private async onTick() {
-    if (!this.minTriggerTime || this.minTriggerTime > currentTime()) return;
+    if (!this._minTriggerTime || this._minTriggerTime > currentTime()) return;
 
-    for (const task of this.activeTasks.values()) {
+    for (const task of this._activeTasks.values()) {
       if (currentTime() < task.triggerTime) continue;
       await this.executeTask(task);
+      this.recalculateMinTriggerTime();
     }
 
-    this.recalculateMinTriggerTime();
-
-    if (!this.minTriggerTime) {
+    if (!this._minTriggerTime) {
       globals.events.unsubscribeById(this._eventListenerId);
       this._eventListenerId = null;
     }
 
     this.clearInactive();
 
-    return { minTriggerTime: this.minTriggerTime, activeTasks: this.activeTasks.size };
+    return { minTriggerTime: this._minTriggerTime, activeTasks: this._activeTasks.size };
   }
 
   recalculateMinTriggerTime() {
-    const activeTasks = Array.from(this.activeTasks.values());
+    const activeTasks = Array.from(this._activeTasks.values());
 
-    this.minTriggerTime = activeTasks.reduce<number | null>((res, task) => {
+    this._minTriggerTime = activeTasks.reduce<number | null>((res, task) => {
       if (!res) return task.triggerTime;
 
       if (res > task.triggerTime) {
@@ -125,12 +129,20 @@ export class TimeTrigger extends Trigger implements TimeTrigger {
       return res;
     }, null);
   }
+
+  inactivateTask(task: TimeTriggerTask) {
+    task.isActive = false;
+
+    this._inactiveTasks.set(task.id, task);
+    this._activeTasks.delete(task.id);
+    this.updateStorageTasks();
+
+    this.recalculateMinTriggerTime();
+  }
+
   private async executeTask(task: TimeTriggerTask) {
     if (!task.callback && !this._registeredHandlers.get(task.name)) {
-      task.isActive = false;
-
-      this.activeTasks.delete(task.id);
-      this.inactiveTasks.set(task.id, task);
+      this.inactivateTask(task);
 
       throw new BaseError(`There is no registered handler or callback for the task`, { taskName: task.name });
     }
@@ -147,11 +159,7 @@ export class TimeTrigger extends Trigger implements TimeTrigger {
       task.isTriggered = true;
 
       if (!task.interval) {
-        task.isActive = false;
-
-        this.inactiveTasks.set(task.id, task);
-        this.activeTasks.delete(task.id);
-
+        this.inactivateTask(task);
         return;
       }
 
@@ -161,12 +169,10 @@ export class TimeTrigger extends Trigger implements TimeTrigger {
       error(e, { task, registeredHandlers });
 
       if (!task.retry) {
-        task.isActive = false;
         task.isTriggered = true;
         task.error = e.message;
 
-        this.inactiveTasks.set(task.id, task);
-        this.activeTasks.delete(task.id);
+        this.inactivateTask(task);
 
         return;
       }
@@ -184,15 +190,14 @@ export class TimeTrigger extends Trigger implements TimeTrigger {
   }
 
   cancelTask(taskId: string) {
-    const task = this.activeTasks.get(taskId);
+    const task = this._activeTasks.get(taskId);
 
     if (!task) {
       error(TimeTrigger.name, 'An error occurred while canceling the task: Task not found', { taskId });
       return;
     }
 
-    this.inactiveTasks.set(taskId, task);
-    this.activeTasks.delete(taskId);
+    this.inactivateTask(task);
     this.clearInactive();
 
     this.recalculateMinTriggerTime();
@@ -200,25 +205,24 @@ export class TimeTrigger extends Trigger implements TimeTrigger {
   }
 
   getTasksByName(taskName: string): TriggerTask[] {
-    return [...this.activeTasks.values()].filter((task) => task.name === taskName);
+    return [...this._activeTasks.values()].filter((task) => task.name === taskName);
   }
 
   getAllTasks(): TimeTriggerTask[] {
-    return [...this.inactiveTasks.values(), ...this.activeTasks.values()];
+    return [...this._inactiveTasks.values(), ...this._activeTasks.values()];
   }
 
   getActiveTasks(): TimeTriggerTask[] {
-    return Array.from(this.activeTasks.values());
+    return Array.from(this._activeTasks.values());
   }
 
   getInactiveTasks(): TimeTriggerTask[] {
-    return Array.from(this.inactiveTasks.values());
+    return Array.from(this._inactiveTasks.values());
   }
 
   cancelAll() {
-    for (const task of this.activeTasks.values()) {
-      this.inactiveTasks.set(task.id, task);
-      this.activeTasks.delete(task.id);
+    for (const task of this._activeTasks.values()) {
+      this.inactivateTask(task);
     }
 
     this.recalculateMinTriggerTime();
@@ -226,33 +230,11 @@ export class TimeTrigger extends Trigger implements TimeTrigger {
   }
 
   private clearInactive() {
-    if (this.inactiveTasks.size < MAX_INACTIVE_TASKS) return;
+    if (this._inactiveTasks.size < MAX_INACTIVE_TASKS) return;
 
-    Array.from(this.inactiveTasks.values())
+    Array.from(this._inactiveTasks.values())
       .sort((a, b) => b.createdTms - a.createdTms)
       .slice(0, -100)
-      .forEach((task) => this.inactiveTasks.delete(task.id));
-  }
-
-  beforeStore() {
-    Array.from(this.activeTasks.entries()).forEach(([taskId, task]) => {
-      if (!!task.callback) {
-        this.activeTasks.delete(taskId);
-      }
-    });
-    this.inactiveTasks.clear();
-  }
-
-  afterReStore() {
-    for (let task of this.getActiveTasks()) {
-      if (task.callback) {
-        this.cancelTask(task.id);
-        warning('PriceTrigger::afterRestore', 'Task with callback was canceled', { task });
-      }
-    }
-    //TODO make a better algorithm for restoring tasks from storage
-    if (!this._eventListenerId) {
-      this._eventListenerId = globals.events.subscribe('onTick', this.onTick, this);
-    }
+      .forEach((task) => this._inactiveTasks.delete(task.id));
   }
 }

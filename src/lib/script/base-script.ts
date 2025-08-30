@@ -279,10 +279,10 @@ export class BaseScript extends BaseObject {
     }
   }
 
-  protected async runOnReportAction(action: string, payload: any) {
+  protected async runOnReportAction(action: string, value: any) {
     try {
-      await this.onReportAction(action, payload);
-      await globals.events.emit('onReportAction', { action, payload });
+      await this.onReportAction(action, value);
+      await globals.events.emit('onReportAction', { action, value });
     } catch (e) {
       await this.runOnError(e);
     }

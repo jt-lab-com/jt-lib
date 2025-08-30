@@ -13,6 +13,7 @@ export interface CreatePriceTaskParams {
   comment?: string;
   group?: string;
   direction?: PriceTriggerDirection;
+  canReStore?: boolean;
 }
 
 export interface PriceTriggerTask extends TriggerTask {

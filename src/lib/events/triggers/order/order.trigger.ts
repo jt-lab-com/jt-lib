@@ -11,12 +11,13 @@ const MAX_INACTIVE_TASKS = 100;
 
 export class OrderTrigger extends Trigger implements OrderTriggerInterface {
   private readonly _registeredHandlers = new Map<string, TriggerHandler>();
-  private readonly activeTasks = new Map<string, OrderTriggerTask>();
-  private readonly inactiveTasks = new Map<string, OrderTriggerTask>();
+  private readonly _activeTasks = new Map<string, OrderTriggerTask>();
+  private readonly _inactiveTasks = new Map<string, OrderTriggerTask>();
 
   private nextId = 1;
-  private eventListenerId: string | null = null;
+  private _eventListenerId: string | null = null;
 
+  storageTasks: OrderTriggerTask[] = [];
   constructor(args: { idPrefix?: string }) {
     super(args);
   }
@@ -55,7 +56,7 @@ export class OrderTrigger extends Trigger implements OrderTriggerInterface {
 
     const id = `order#${this.nextId++}`;
 
-    this.activeTasks.set(id, {
+    this._activeTasks.set(id, {
       ...params,
       id,
       type: 'order',
@@ -67,15 +68,15 @@ export class OrderTrigger extends Trigger implements OrderTriggerInterface {
       created: currentTimeString(),
     });
 
-    if (!this.eventListenerId) {
-      this.eventListenerId = globals.events.subscribe('onOrderChange', this.onOrderChange, this);
+    if (!this._eventListenerId) {
+      this._eventListenerId = globals.events.subscribe('onOrderChange', this.onOrderChange, this);
     }
     log('OrderTrigger::addTask', 'New task registered', { task: params });
     return id;
   }
 
   private async onOrderChange(order: Order) {
-    for (const task of this.activeTasks.values()) {
+    for (const task of this._activeTasks.values()) {
       if (!!task.clientOrderId && task.clientOrderId !== order.clientOrderId) continue;
       if (!!task.orderId && task.orderId !== order.id) continue;
       if (order.status !== task.status) continue;
@@ -83,20 +84,33 @@ export class OrderTrigger extends Trigger implements OrderTriggerInterface {
       await this.executeTask(task);
     }
 
-    if (!this.activeTasks.size) {
-      globals.events.unsubscribeById(this.eventListenerId);
-      this.eventListenerId = null;
+    if (!this._activeTasks.size) {
+      globals.events.unsubscribeById(this._eventListenerId);
+      this._eventListenerId = null;
     }
 
     this.clearInactive();
   }
 
+  inactivateTask(task: OrderTriggerTask) {
+    task.isActive = false;
+    if (task.group) {
+      Array.from(this._activeTasks.values())
+        .filter((activeTask) => activeTask.group === task.group)
+        .forEach((task) => {
+          this._inactiveTasks.set(task.id, { ...task, isActive: false });
+          this._activeTasks.delete(task.id);
+        });
+    }
+
+    this._inactiveTasks.set(task.id, task);
+    this._activeTasks.delete(task.id);
+
+    this.updateStorageTasks();
+  }
   private async executeTask(task: OrderTriggerTask) {
     if (!task.callback && !this._registeredHandlers.get(task.name)) {
-      task.isActive = false;
-
-      this.activeTasks.delete(task.id);
-      this.inactiveTasks.set(task.id, task);
+      this.inactivateTask(task);
 
       throw new BaseError(`There is no registered handler or callback for the task`, { taskName: task.name });
     }
@@ -110,33 +124,21 @@ export class OrderTrigger extends Trigger implements OrderTriggerInterface {
       }
 
       task.isTriggered = true;
-      task.isActive = false;
+
       task.executedTimes++;
       task.lastExecuted = currentTimeString();
 
-      if (task.group) {
-        Array.from(this.activeTasks.values())
-          .filter((activeTask) => activeTask.group === task.group)
-          .forEach((task) => {
-            this.inactiveTasks.set(task.id, { ...task, isActive: false });
-            this.activeTasks.delete(task.id);
-          });
-      }
-
-      this.inactiveTasks.set(task.id, task);
-      this.activeTasks.delete(task.id);
+      this.inactivateTask(task);
     } catch (e) {
       error(e, {
         task,
       });
 
       if (!task.retry) {
-        task.isActive = false;
         task.isTriggered = true;
         task.error = e.message;
 
-        this.inactiveTasks.set(task.id, task);
-        this.activeTasks.delete(task.id);
+        this.inactivateTask(task);
 
         return;
       }
@@ -150,71 +152,71 @@ export class OrderTrigger extends Trigger implements OrderTriggerInterface {
   }
 
   cancelTask(taskId: string) {
-    const task = this.activeTasks.get(taskId);
+    const task = this._activeTasks.get(taskId);
 
     if (!task) {
       error(OrderTrigger.name, 'An error occurred while canceling the task: Task not found', { taskId });
       return;
     }
 
-    this.inactiveTasks.set(taskId, task);
-    this.activeTasks.delete(taskId);
+    this._inactiveTasks.set(taskId, task);
+    this._activeTasks.delete(taskId);
     this.clearInactive();
   }
 
   getTasksByName(taskName: string): TriggerTask[] {
-    return [...this.activeTasks.values()].filter((task) => task.name === taskName);
+    return [...this._activeTasks.values()].filter((task) => task.name === taskName);
   }
 
   getAllTasks(): TriggerTask[] {
-    return [...this.inactiveTasks.values(), ...this.activeTasks.values()];
+    return [...this._inactiveTasks.values(), ...this._activeTasks.values()];
   }
 
   getActiveTasks(): TriggerTask[] {
-    return Array.from(this.activeTasks.values());
+    return Array.from(this._activeTasks.values());
   }
 
   getInactiveTasks(): TriggerTask[] {
-    return Array.from(this.inactiveTasks.values());
+    return Array.from(this._inactiveTasks.values());
   }
 
   cancelAll() {
-    for (const task of this.activeTasks.values()) {
-      this.inactiveTasks.set(task.id, task);
-      this.activeTasks.delete(task.id);
+    for (const task of this._activeTasks.values()) {
+      this._inactiveTasks.set(task.id, task);
+      this._activeTasks.delete(task.id);
     }
 
     this.clearInactive();
   }
 
   private clearInactive() {
-    if (this.inactiveTasks.size < MAX_INACTIVE_TASKS) return;
+    if (this._inactiveTasks.size < MAX_INACTIVE_TASKS) return;
 
-    Array.from(this.inactiveTasks.values())
+    Array.from(this._inactiveTasks.values())
       .sort((a, b) => b.createdTms - a.createdTms)
       .slice(0, -100)
-      .forEach((task) => this.inactiveTasks.delete(task.id));
+      .forEach((task) => this._inactiveTasks.delete(task.id));
   }
 
   beforeStore() {
-    Array.from(this.activeTasks.entries()).forEach(([taskId, task]) => {
-      if (!!task.callback) {
-        this.activeTasks.delete(taskId);
-      }
-    });
-    this.inactiveTasks.clear();
+    // Array.from(this.activeTasks.entries()).forEach(([taskId, task]) => {
+    //   if (!!task.callback) {
+    //     this.activeTasks.delete(taskId);
+    //   }
+    // });
+    // this.inactiveTasks.clear();
   }
 
   afterReStore() {
     for (let task of this.getActiveTasks()) {
-      if (task.callback) {
+      if (!task?.canReStore) {
         this.cancelTask(task.id);
         warning('PriceTrigger::afterRestore', 'Task with callback was canceled', { task });
       }
     }
 
-    if (!this.eventListenerId) {
-      this.eventListenerId = globals.events.subscribe('onOrderChange', this.onOrderChange, this);
+    if (!this._eventListenerId) {
+      this._eventListenerId = globals.events.subscribe('onOrderChange', this.onOrderChange, this);
     }
   }
 }
