@@ -83,14 +83,14 @@ export function error(...args: any): void {
     if (globals.errorCount > 20) {
       let errCnt = globals.errorCount;
       globals.errorCount = 0;
-      globals.strategy.forceStop('Too many errors count=' + errCnt);
+      globals.script.forceStop('Too many errors count=' + errCnt);
     }
   } else {
     if (globals.errorCount > 10) {
       let errCnt = globals.errorCount;
 
       globals.errorCount = 0;
-      globals.strategy.forceStop('Too many errors count =' + errCnt);
+      globals.script.forceStop('Too many errors count =' + errCnt);
     }
     if (globals.lastErrorTime + 60 * 60 * 1000 > currentTime()) {
       globals.errorCount = 0;
@@ -191,7 +191,7 @@ function _updateLog(
     if (globals.consoleLogCount > MAX_CONSOLE_LOG) {
       console.error('Too many console.log() calls. Max count = ' + MAX_CONSOLE_LOG);
 
-      globals.strategy.forceStop('Too many console.log() calls. Max count = ' + MAX_CONSOLE_LOG);
+      globals.script.forceStop('Too many console.log() calls. Max count = ' + MAX_CONSOLE_LOG);
     }
   }
 

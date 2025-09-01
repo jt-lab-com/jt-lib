@@ -6,7 +6,6 @@ import { BaseObject } from '../core/base-object';
 import { Storage } from '../core/storage';
 import { getArgBoolean, getArgString } from '../core/base';
 import { BaseError } from '../core/errors';
-import { normalize } from '../utils/numbers';
 import { CandlesBufferService } from '../candles';
 import { Indicators } from '../indicators';
 
@@ -67,7 +66,8 @@ export class BaseScript extends BaseObject {
     }
 
     const idPrefix = 'Global'; //
-    globals.strategy = this;
+    globals.script = this;
+
     globals.events = new EventEmitter({ idPrefix });
     globals.triggers = new TriggerService({ idPrefix });
     globals.report = new Report({ idPrefix });
@@ -106,12 +106,11 @@ export class BaseScript extends BaseObject {
 
   protected async init() {
     try {
+      await globals.storage.init();
       let balanceInfo = await getBalance();
       this.balanceTotal = balanceInfo.total.USDT;
       this.balanceFree = balanceInfo.free.USDT;
       log('BaseScript::init', 'getBalance', balanceInfo, true);
-
-      await globals.storage.init();
     } catch (e) {
       throw new BaseError(e, {});
     } finally {
@@ -149,7 +148,6 @@ export class BaseScript extends BaseObject {
     this._isTickLocked = true;
     try {
       //TODO delete all   await globals.events.emit('onBeforeTick');    await globals.events.emit('onAfterTick');
-
       // await this.onBeforeTick();
       //  await globals.events.emit('onBeforeTick');
       await this.onTick(data);
@@ -237,6 +235,7 @@ export class BaseScript extends BaseObject {
 
   protected runArgsUpdate = async (args: GlobalARGS) => {
     try {
+      if (getArgBoolean('isDebug', false)) globals.isDebug = true;
       await this.onArgsUpdate(args);
       await globals.events.emit('onArgsUpdate', args);
     } catch (e) {
