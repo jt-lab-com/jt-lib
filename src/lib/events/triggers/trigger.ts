@@ -16,31 +16,41 @@ export abstract class Trigger extends BaseObject {
   abstract inactivateTask(task: TriggerTask): void;
   abstract storageTasks: TriggerTask[];
 
+  _args: any = {};
+
   constructor(args: any = {}) {
     super(args);
 
-    if (args?.storageKey && !isTester()) {
+    this._args = args;
+  }
+
+  init() {
+    const storageKey = this._args?.storageKey;
+    if (storageKey && !isTester()) {
       try {
+        const symbol = this._args?.symbol ? `#${this._args.symbol}` : '';
+
         const className = this.constructor.name;
-        const symbol = args?.symbol ? '-' + args.symbol : '';
-        const key = className + args.storageKey + symbol;
-        globals.storage.addObject(key, this);
-        log('Trigger::constructor', `Object added to storage with key ${key}`, { args });
+        const key = className + storageKey + symbol;
+        globals.storage.addObject(key, this, ['storageTasks']);
+        log('Trigger::init', `Object added to storage with key ${key}`, { args: this._args });
       } catch (e) {
-        error(e, { args });
+        error(e, { args: this._args });
       }
     }
   }
-
   beforeStore() {
     this.updateStorageTasks();
   }
   updateStorageTasks() {
     let tasks = this.getActiveTasks().filter((task) => task?.canReStore);
-    log('TimeTrigger::updateStorageTasks', 'updating storage tasks', { tasks }, true);
+    //log('TimeTrigger::updateStorageTasks', 'updating storage tasks', { tasks }, true);
     this.storageTasks = tasks;
   }
+
   afterReStore() {
+    const className = this.constructor.name;
+    log('Trigger::afterReStore', 'restoring tasks from storage', { storageTasks: this.storageTasks, className }, true);
     if (this.storageTasks?.length) {
       for (const task of this.storageTasks) {
         this.addTask(task);

@@ -18,7 +18,7 @@ export class OrderTrigger extends Trigger implements OrderTriggerInterface {
   private _eventListenerId: string | null = null;
 
   storageTasks: OrderTriggerTask[] = [];
-  constructor(args: { idPrefix?: string }) {
+  constructor(args: { idPrefix?: string; storageKey?: string } = {}) {
     super(args);
   }
 
@@ -71,6 +71,9 @@ export class OrderTrigger extends Trigger implements OrderTriggerInterface {
     if (!this._eventListenerId) {
       this._eventListenerId = globals.events.subscribe('onOrderChange', this.onOrderChange, this);
     }
+    if (params?.canReStore) {
+      this.updateStorageTasks();
+    }
     log('OrderTrigger::addTask', 'New task registered', { task: params });
     return id;
   }
@@ -112,7 +115,10 @@ export class OrderTrigger extends Trigger implements OrderTriggerInterface {
     if (!task.callback && !this._registeredHandlers.get(task.name)) {
       this.inactivateTask(task);
 
-      throw new BaseError(`There is no registered handler or callback for the task`, { taskName: task.name });
+      throw new BaseError(`There is no registered handler or callback for the task`, {
+        taskName: task.name,
+        handlers: this._registeredHandlers.keys(),
+      });
     }
 
     try {
@@ -196,27 +202,5 @@ export class OrderTrigger extends Trigger implements OrderTriggerInterface {
       .sort((a, b) => b.createdTms - a.createdTms)
       .slice(0, -100)
       .forEach((task) => this._inactiveTasks.delete(task.id));
-  }
-
-  beforeStore() {
-    // Array.from(this.activeTasks.entries()).forEach(([taskId, task]) => {
-    //   if (!!task.callback) {
-    //     this.activeTasks.delete(taskId);
-    //   }
-    // });
-    // this.inactiveTasks.clear();
-  }
-
-  afterReStore() {
-    for (let task of this.getActiveTasks()) {
-      if (!task?.canReStore) {
-        this.cancelTask(task.id);
-        warning('PriceTrigger::afterRestore', 'Task with callback was canceled', { task });
-      }
-    }
-
-    if (!this._eventListenerId) {
-      this._eventListenerId = globals.events.subscribe('onOrderChange', this.onOrderChange, this);
-    }
   }
 }

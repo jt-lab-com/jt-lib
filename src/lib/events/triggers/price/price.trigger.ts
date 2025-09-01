@@ -25,7 +25,7 @@ export class PriceTrigger extends Trigger implements PriceTriggerInterface {
   private _nextId = 1;
 
   symbol: string;
-  constructor(args: { symbol: string; idPrefix?: string }) {
+  constructor(args: { symbol: string; idPrefix?: string; storageKey?: string }) {
     if (!args?.symbol) {
       throw new BaseError('PriceTrigger::constructor symbol is required ', args);
     }
@@ -115,6 +115,7 @@ export class PriceTrigger extends Trigger implements PriceTriggerInterface {
       created: currentTimeString(),
       createdTms: currentTime(),
       lastExecuted: null,
+      canReStore: params.canReStore ?? false,
     };
 
     switch (direction) {
@@ -131,6 +132,9 @@ export class PriceTrigger extends Trigger implements PriceTriggerInterface {
     }
 
     this.recalculateBorderPrices(direction);
+    if (params?.canReStore) {
+      this.updateStorageTasks();
+    }
     log('PriceTrigger::addTask', 'New task registered', { task: task, price: currentPrice, params });
 
     return id;
@@ -202,7 +206,10 @@ export class PriceTrigger extends Trigger implements PriceTriggerInterface {
     if (!task.callback && !this._registeredHandlers.get(task.name)) {
       this.inactivateTask(task);
 
-      throw new BaseError(`There is no registered handler or callback for the task`, { task });
+      throw new BaseError(`There is no registered handler or callback for the task`, {
+        task,
+        handlers: this._registeredHandlers.keys(),
+      });
     }
 
     try {
@@ -362,33 +369,5 @@ export class PriceTrigger extends Trigger implements PriceTriggerInterface {
       .sort((a, b) => b.createdTms - a.createdTms)
       .slice(0, -100)
       .forEach((task) => this._inactiveTasks.delete(task.id));
-  }
-
-  async beforeStore() {
-    // Array.from(this.upperPriceTasks.entries()).forEach(([taskId, task]) => {
-    //   if (!!task.callback) {
-    //     this.upperPriceTasks.delete(taskId);
-    //   }
-    // });
-    // Array.from(this.lowerPriceTasks.entries()).forEach(([taskId, task]) => {
-    //   if (!!task.callback) {
-    //     this.lowerPriceTasks.delete(taskId);
-    //   }
-    // });
-    // this.inactiveTasks.clear();
-  }
-
-  afterReStore() {
-    // warning('PriceTrigger::afterRestore', 'Task with callback was canceled', { tasks: this.getActiveTasks() });
-    for (let task of this.getActiveTasks()) {
-      if (!task?.canReStore) {
-        this.cancelTask(task.id);
-        warning('PriceTrigger::afterRestore', 'Task with callback was canceled', { task });
-      }
-    }
-
-    if (!this._eventListenerId) {
-      this._eventListenerId = globals.events.subscribeOnTick(this.onTick, this, this.symbol);
-    }
   }
 }

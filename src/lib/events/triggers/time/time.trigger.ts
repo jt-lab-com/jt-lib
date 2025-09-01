@@ -144,7 +144,10 @@ export class TimeTrigger extends Trigger implements TimeTrigger {
     if (!task.callback && !this._registeredHandlers.get(task.name)) {
       this.inactivateTask(task);
 
-      throw new BaseError(`There is no registered handler or callback for the task`, { taskName: task.name });
+      throw new BaseError(`There is no registered handler or callback for the task`, {
+        taskName: task.name,
+        handlers: this._registeredHandlers.keys(),
+      });
     }
 
     try {

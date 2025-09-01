@@ -25,6 +25,7 @@ export class Storage extends BaseObject {
 
   objects: Record<string, CacheObjectInfo> = {};
   state: Record<string, StateInfo> = {};
+  isActive = !isTester();
   isDebug = false;
 
   stateKey = getPrefix() + '-global-storage';
@@ -32,12 +33,13 @@ export class Storage extends BaseObject {
   constructor(args: any = {}) {
     super(args);
 
-    if (getArgBoolean('isDebugStorage', false)) {
-      this.isDebug = true;
+    if (!this.isActive) {
+      log('Storage::Constructor', 'Storage is inactive in tester mode');
     }
   }
 
   addObject(key, obj: BaseObject | object, props = []) {
+    if (!this.isActive) return;
     const objId = obj['id'] || null;
     let info: CacheObjectInfo = {
       key,
@@ -49,7 +51,7 @@ export class Storage extends BaseObject {
 
     this.objects[key] = info;
 
-    log('Storage:addObject', 'Object added', { key, objId, props });
+    log('Storage:addObject', 'Object added ' + key, { key, objId, props });
     if (this.state[key]) this.reStoreState(key, obj);
   }
 
@@ -62,7 +64,7 @@ export class Storage extends BaseObject {
   }
 
   async init() {
-    if (isTester()) return;
+    if (!this.isActive) return;
     await this.loadState();
   }
 
@@ -79,9 +81,14 @@ export class Storage extends BaseObject {
 
     this.applyState(state, obj);
 
-    log('Storage::restoreState', obj.constructor.name + ' is restored from key = ' + key, {
-      restoredPropsLevel1: this.restoredPropsLevel1,
-    });
+    log(
+      'Storage::restoreState',
+      obj.constructor.name + ' is restored from key = ' + key,
+      {
+        restoredPropsLevel1: this.restoredPropsLevel1,
+      },
+      true,
+    );
   }
 
   private getState(obj: object, i = 0, props = []): StateInfo {
@@ -301,6 +308,7 @@ export class Storage extends BaseObject {
       throw new BaseError(e, { context });
     }
 
+    propsInfo.push(obj.constructor.name + '.afterReStore ' + typeof obj['afterReStore']);
     this.callAfterRestore(obj);
     return obj;
   }

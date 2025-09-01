@@ -506,14 +506,14 @@ export class Report extends BaseObject {
   }
 
   _lastUpdated = 0;
-  async updateReport(args = {}) {
-    if (this._lastUpdated && Date.now() - this._lastUpdated < 9000) {
-      this._lastUpdated = Date.now();
+  async updateReport(args: any = {}) {
+    if (args?.isForce === true && this._lastUpdated && Date.now() - this._lastUpdated < 900) {
       warning('Report::updateReport', 'Report updated too often, ignoring', { lastUpdated: this._lastUpdated });
+      return;
     }
-    try {
-      this.lastTimeUpdate = Date.now();
 
+    this._lastUpdated = Date.now();
+    try {
       this._reportData = {
         id: getArtifactsKey(),
         symbol: this.symbol,

@@ -18,19 +18,22 @@ export class TriggerService extends BaseObject implements TriggerServiceInterfac
     super(args);
     this.idPrefix = args?.idPrefix ?? '';
     this._timeTrigger = new TimeTrigger({ idPrefix: this.idPrefix, storageKey: args?.storageKey });
-    this._orderTrigger = new OrderTrigger({ idPrefix: this.idPrefix });
+    this._timeTrigger.init();
+    this._orderTrigger = new OrderTrigger({ idPrefix: this.idPrefix, storageKey: args?.storageKey });
+    this._orderTrigger.init();
 
     if (args?.symbol) {
       let symbol = args.symbol;
-      this.createNewPriceTrigger(symbol);
+      this.createNewPriceTrigger(symbol, args?.storageKey);
     }
 
     this.addChild(this._timeTrigger);
     this.addChild(this._orderTrigger);
   }
 
-  private createNewPriceTrigger(symbol: string) {
-    let trigger = new PriceTrigger({ symbol });
+  private createNewPriceTrigger(symbol: string, storageKey: string = undefined) {
+    let trigger = new PriceTrigger({ symbol, storageKey });
+    trigger.init();
     this.addChild(trigger);
     this._priceTriggers[symbol] = trigger;
     return trigger;

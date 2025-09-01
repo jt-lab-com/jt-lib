@@ -69,10 +69,11 @@ export class OrdersBasket extends BaseObject {
 
     globals.events.subscribeOnTick(this.beforeOnTick, this, this.symbol);
 
-    this.triggerService = new TriggerService({ idPrefix: this.symbol, symbol: this.symbol });
-    this.triggerService.registerPriceHandler(params.symbol, 'executeStopLoss', this.createOrderByTrigger, this);
-    this.triggerService.registerPriceHandler(params.symbol, 'executeTakeProfit', this.createOrderByTrigger, this);
-    this.triggerService.registerPriceHandler(params.symbol, 'createOrderByTrigger', this.createOrderByTrigger, this);
+    const symbol = this.symbol;
+    this.triggerService = new TriggerService({ idPrefix: this.symbol, symbol, storageKey: symbol });
+    this.triggerService.registerPriceHandler(symbol, 'executeStopLoss', this.createOrderByTrigger, this);
+    this.triggerService.registerPriceHandler(symbol, 'executeTakeProfit', this.createOrderByTrigger, this);
+    this.triggerService.registerPriceHandler(symbol, 'createOrderByTrigger', this.createOrderByTrigger, this);
 
     this.triggerService.registerOrderHandler('creteSlTpByTriggers', this.createSlTpByTriggers, this);
     this.triggerService.registerOrderHandler('cancelSlTpByTriggers', this.cancelSlTpByTriggers, this);
@@ -295,7 +296,7 @@ export class OrdersBasket extends BaseObject {
     }
 
     this.posSlot[posSide] = position;
-
+    logOnce('OrdersBasket::_updatePosSlot ' + this.symbol, 'Position slot updated', { pnl, position, posSide, order });
     return pnl;
   }
 
@@ -303,7 +304,7 @@ export class OrdersBasket extends BaseObject {
     try {
       if (order.status === 'closed') {
         let pnl = await this._updatePosSlot(order);
-        if (pnl) {
+        if (pnl !== 0) {
           await this.onPnlChange(pnl, 'pnl');
           await globals.events.emit('onPnlChange', { type: 'pnl', amount: pnl, symbol: this.symbol, order });
         }
@@ -404,13 +405,15 @@ export class OrdersBasket extends BaseObject {
         canReStore: true,
       });
 
-      this.triggerService.addTaskByOrder({
-        clientOrderId,
-        args: { taskId },
-        name: 'cancelSlTpByTriggers',
-        status: 'canceled',
-        canReStore: true,
-      });
+      if (this.triggerType === 'exchange') {
+        this.triggerService.addTaskByOrder({
+          clientOrderId,
+          args: { taskId },
+          name: 'cancelSlTpByTriggers',
+          status: 'canceled',
+          canReStore: true,
+        });
+      }
 
       log('OrdersBasket::createOrder', 'Stop orders params saved', this.stopOrdersQueue.get(clientOrderId));
     }
@@ -447,6 +450,7 @@ export class OrdersBasket extends BaseObject {
         symbol: this.symbol,
         group,
         args: orderParams,
+        canReStore: true,
       });
 
       log('OrdersBasket::createOrder', 'Trigger price task ' + taskName + ' added', {
@@ -459,7 +463,11 @@ export class OrdersBasket extends BaseObject {
         params,
       });
 
-      return { clientOrderId, id: null } as Order;
+      return {
+        clientOrderId,
+        id: null,
+        msg: 'trigger order added to TriggerService queue because OrderBasket.triggerType=script',
+      } as Order;
     }
 
     const { orderParams, userParams } = this.validateParams(params);
@@ -884,7 +892,7 @@ export class OrdersBasket extends BaseObject {
 
     const orderToClose = this.ordersByClientId.get(ownerClientOrderId);
 
-    debug('OrdersBasket::createSlTpOrders', 'Order to close', { orderToClose, ownerClientOrderId, sl, tp });
+    //debug('OrdersBasket::createSlTpOrders', 'Order to close', { orderToClose, ownerClientOrderId, sl, tp });
 
     if (!orderToClose) {
       warning('OrdersBasket::createSlTpOrders', 'Order not found or not closed', { ownerClientOrderId });
@@ -988,6 +996,26 @@ export class OrdersBasket extends BaseObject {
 
     return id;
   }
+
+  /**
+   * Parse client order id to get order info
+   * @param clientOrderId
+   * @protected
+   * @return {object} - parsed client order id
+   * Example:
+   * clientOrderId: 1691234567890-01-M1234.TP
+   * {
+   *   uniquePrefix: '1691234567890',
+   *   prefix: '01',
+   *   shortClientId: 'M1234.TP',
+   *   ownerClientOrderId: '1691234567890-01-M1234',
+   *   ClientOrderId: '1691234567890-01-M1234',
+   *   triggerOrderType: 'TP',
+   *   clientOrderId: '169123456789
+   *
+   * }
+
+   */
 
   protected parseClientOrderId(clientOrderId: string) {
     if (!clientOrderId) {
