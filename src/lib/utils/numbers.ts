@@ -21,19 +21,19 @@ export const validateNumbers = (...args: any[]): boolean => {
   return true;
 };
 
-export const validateNumbersInObject = (obj: any): boolean => {
+export const validateNumbersInObject = (obj: any, showWarning = true): boolean => {
   if (typeof obj !== 'object') {
     throw new BaseError('The argument must be an object');
   }
 
-  let wrongKeys = [];
+  const wrongKeys = [];
   for (let key in obj) {
-    if (isNaN(obj[key])) {
+    if (isNaN(obj[key]) || obj[key] === undefined || obj[key] === null || typeof obj[key] !== 'number') {
       wrongKeys.push({ key: key, value: obj[key], vType: typeof obj[key] });
     }
   }
 
-  if (wrongKeys.length > 0) {
+  if (wrongKeys.length > 0 && showWarning) {
     warning('validateNumbersInObject', 'All values of the object must be valid numbers. Wrong keys: ', wrongKeys);
     return false;
   }
