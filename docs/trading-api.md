@@ -5,7 +5,7 @@ This section documents the functions related to trading operations. These functi
 
 * **Methods**
   - [getPositions](#getPositions)
-  - [getBalance](#getBalance)
+  - [getBalance](#getbalance)
   - [getOrders](#getOrders)
   - [getOpenOrders](#getOpenOrders)
   - [getClosedOrders](#getClosedOrders)
@@ -24,7 +24,7 @@ This section documents the functions related to trading operations. These functi
   - [OrderType](#ordertype)
   - [OrderSide](#orderside)
 
-<br>
+
 
 ## Methods
 
@@ -33,14 +33,14 @@ This section documents the functions related to trading operations. These functi
 Returns an array of positions for the current script.
 
 ```typescript
-getPositions(): Promise<Position[]>
+ getPositions(): Promise<Position[]>
 ```
 
 * **Returns:** _Promise<Array<[Position](#position)>>_.
 
 ___
 
-<br>
+
 
 ### [getBalance](#getBalance)
 

@@ -6,7 +6,10 @@ import { error } from '../core/log';
  * @param tfMin - timeframe in minutes (1, 5, 15, 60, 240, 1440, 10080, 43200)
  * @returns {number}
  */
-export function roundTimeByTimeframe(timestamp: number, tfMin: number): number {
+export function roundTimeByTimeframe(timestamp: number, tfMin: number | string): number {
+  if (typeof tfMin === 'string') {
+    tfMin = convertTimeframeToNumber(tfMin);
+  }
   tfMin = tfMin * 60 * 1000;
   return Math.floor(timestamp / tfMin) * tfMin;
 }

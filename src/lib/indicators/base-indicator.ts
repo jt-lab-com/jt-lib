@@ -8,6 +8,7 @@ export class BaseIndicator extends BaseObject {
   protected readonly timeframe: string;
   protected candlesBuffer: CandlesBuffer;
   protected buffer: BufferIndicatorItem[] = [];
+
   notForDestroy = ['candlesBuffer'];
 
   constructor(symbol: string, timeframe: TimeFrame, buffer: CandlesBuffer) {
@@ -35,5 +36,16 @@ export class BaseIndicator extends BaseObject {
 
   getIndicatorValues() {
     return this.buffer;
+  }
+
+  getInfo() {
+    return {
+      symbol: this.symbol,
+      timeframe: this.timeframe,
+      bufferLength: this.buffer.length,
+      candlesBufferLength: this.candlesBuffer.getCandles().length,
+      lastValue: this.getValue(),
+      lastTimestamp: this.buffer[this.buffer.length - 1]?.timestamp,
+    };
   }
 }

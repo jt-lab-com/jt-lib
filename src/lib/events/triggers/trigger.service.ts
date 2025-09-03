@@ -9,47 +9,50 @@ import { OrderTrigger } from './order/order.trigger';
 import { error } from '../../core/log';
 
 export class TriggerService extends BaseObject implements TriggerServiceInterface {
-  private readonly timeTrigger: TimeTrigger;
-  private readonly orderTrigger: OrderTrigger;
-  private readonly priceTriggers: Record<string, PriceTrigger> = {};
+  private readonly _timeTrigger: TimeTrigger;
+  private readonly _orderTrigger: OrderTrigger;
+  private readonly _priceTriggers: Record<string, PriceTrigger> = {};
 
   idPrefix = '';
-  constructor(args: { idPrefix?: string; symbol?: string }) {
+  constructor(args: { idPrefix?: string; symbol?: string; storageKey?: string } = {}) {
     super(args);
     this.idPrefix = args?.idPrefix ?? '';
-    this.timeTrigger = new TimeTrigger({ idPrefix: this.idPrefix });
-    this.orderTrigger = new OrderTrigger({ idPrefix: this.idPrefix });
+    this._timeTrigger = new TimeTrigger({ idPrefix: this.idPrefix, storageKey: args?.storageKey });
+    this._timeTrigger.init();
+    this._orderTrigger = new OrderTrigger({ idPrefix: this.idPrefix, storageKey: args?.storageKey });
+    this._orderTrigger.init();
 
     if (args?.symbol) {
       let symbol = args.symbol;
-      this.createNewPriceTrigger(symbol);
+      this.createNewPriceTrigger(symbol, args?.storageKey);
     }
 
-    this.addChild(this.timeTrigger);
-    this.addChild(this.orderTrigger);
+    this.addChild(this._timeTrigger);
+    this.addChild(this._orderTrigger);
   }
 
-  private createNewPriceTrigger(symbol: string) {
-    let trigger = new PriceTrigger({ symbol });
+  private createNewPriceTrigger(symbol: string, storageKey: string = undefined) {
+    let trigger = new PriceTrigger({ symbol, storageKey });
+    trigger.init();
     this.addChild(trigger);
-    this.priceTriggers[symbol] = trigger;
+    this._priceTriggers[symbol] = trigger;
     return trigger;
   }
 
   getPriceTrigger(symbol: string) {
-    if (this.priceTriggers[symbol]) {
-      return this.priceTriggers[symbol];
+    if (this._priceTriggers[symbol]) {
+      return this._priceTriggers[symbol];
     } else {
       return this.createNewPriceTrigger(symbol);
     }
   }
 
   registerOrderHandler(taskName: string, handler: Function, owner: BaseObject) {
-    this.orderTrigger.registerHandler(taskName, handler, owner);
+    this._orderTrigger.registerHandler(taskName, handler, owner);
   }
 
   hasOrderHandler(taskName: string) {
-    return this.orderTrigger.hasHandler(taskName);
+    return this._orderTrigger.hasHandler(taskName);
   }
 
   registerPriceHandler(symbol: string, taskName: string, handler: Function, owner: BaseObject) {
@@ -59,7 +62,7 @@ export class TriggerService extends BaseObject implements TriggerServiceInterfac
   }
 
   hasPriceHandler(symbol: string, taskName: string) {
-    const trigger = this.priceTriggers[symbol];
+    const trigger = this._priceTriggers[symbol];
 
     if (!trigger) return false;
 
@@ -67,11 +70,11 @@ export class TriggerService extends BaseObject implements TriggerServiceInterfac
   }
 
   registerTimeHandler(taskName: string, handler: Function, owner: BaseObject) {
-    this.timeTrigger.registerHandler(taskName, handler, owner);
+    this._timeTrigger.registerHandler(taskName, handler, owner);
   }
 
   hasTimeHandler(taskName: string) {
-    return this.timeTrigger.hasHandler(taskName);
+    return this._timeTrigger.hasHandler(taskName);
   }
 
   /**
@@ -86,7 +89,7 @@ export class TriggerService extends BaseObject implements TriggerServiceInterfac
    * comment - task comment
    */
   addTaskByTime(params: CreateTimeTaskParams) {
-    return this.timeTrigger.addTask(params);
+    return this._timeTrigger.addTask(params);
   }
 
   /**
@@ -100,7 +103,7 @@ export class TriggerService extends BaseObject implements TriggerServiceInterfac
    * comment - task comment
    */
   addTaskByOrder(params: CreateOrderTaskParams) {
-    return this.orderTrigger.addTask(params);
+    return this._orderTrigger.addTask(params);
   }
 
   /**
@@ -123,9 +126,9 @@ export class TriggerService extends BaseObject implements TriggerServiceInterfac
   }
 
   getActiveTasks(): TriggerTask[] {
-    const timeTasks = this.timeTrigger.getActiveTasks();
-    const orderTasks = this.orderTrigger.getActiveTasks();
-    const priceTasks = Object.values(this.priceTriggers).reduce((acc, trigger) => {
+    const timeTasks = this._timeTrigger.getActiveTasks();
+    const orderTasks = this._orderTrigger.getActiveTasks();
+    const priceTasks = Object.values(this._priceTriggers).reduce((acc, trigger) => {
       return [...acc, ...trigger.getActiveTasks()];
     }, []);
 
@@ -133,9 +136,9 @@ export class TriggerService extends BaseObject implements TriggerServiceInterfac
   }
 
   getInactiveTasks() {
-    const timeTasks = this.timeTrigger.getInactiveTasks();
-    const orderTasks = this.orderTrigger.getInactiveTasks();
-    const priceTasks = Object.values(this.priceTriggers).reduce((acc, trigger) => {
+    const timeTasks = this._timeTrigger.getInactiveTasks();
+    const orderTasks = this._orderTrigger.getInactiveTasks();
+    const priceTasks = Object.values(this._priceTriggers).reduce((acc, trigger) => {
       return [...acc, ...trigger.getInactiveTasks()];
     }, []);
 
@@ -145,7 +148,7 @@ export class TriggerService extends BaseObject implements TriggerServiceInterfac
   getTasksByName(taskName: string, type: TaskType): TriggerTask[] {
     if (type === 'price') {
       let priceTasks = [];
-      for (const priceTrigger of Object.values(this.priceTriggers)) {
+      for (const priceTrigger of Object.values(this._priceTriggers)) {
         const tasks = priceTrigger.getTasksByName(taskName);
         priceTasks = [...priceTasks, ...tasks];
       }
@@ -153,19 +156,19 @@ export class TriggerService extends BaseObject implements TriggerServiceInterfac
       return priceTasks;
     }
 
-    if (type === 'order') return this.orderTrigger.getTasksByName(taskName);
+    if (type === 'order') return this._orderTrigger.getTasksByName(taskName);
 
-    if (type === 'time') return this.timeTrigger.getTasksByName(taskName);
+    if (type === 'time') return this._timeTrigger.getTasksByName(taskName);
 
     return [];
   }
 
   cancelOrderTask(taskId: string) {
-    return this.orderTrigger.cancelTask(taskId);
+    return this._orderTrigger.cancelTask(taskId);
   }
 
   cancelPriceTask(taskId: string, symbol: string) {
-    const trigger = this.priceTriggers[symbol];
+    const trigger = this._priceTriggers[symbol];
 
     if (!trigger) {
       error(TriggerService.name, 'Price trigger not found', { taskId, symbol });
@@ -176,7 +179,7 @@ export class TriggerService extends BaseObject implements TriggerServiceInterfac
   }
 
   cancelTimeTask(taskId: string) {
-    return this.timeTrigger.cancelTask(taskId);
+    return this._timeTrigger.cancelTask(taskId);
   }
 
   cancelAll() {
@@ -186,16 +189,16 @@ export class TriggerService extends BaseObject implements TriggerServiceInterfac
   }
 
   cancelAllOrderTasks(): void {
-    this.orderTrigger.cancelAll();
+    this._orderTrigger.cancelAll();
   }
 
   cancelAllPriceTasks(): void {
-    for (const priceTrigger of Object.values(this.priceTriggers)) {
+    for (const priceTrigger of Object.values(this._priceTriggers)) {
       priceTrigger.cancelAll();
     }
   }
 
   cancelAllTimeTasks(): void {
-    this.timeTrigger.cancelAll();
+    this._timeTrigger.cancelAll();
   }
 }

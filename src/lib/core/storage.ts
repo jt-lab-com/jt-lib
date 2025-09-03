@@ -1,17 +1,17 @@
-import { currentTimeString } from '../utils/date-time';
 import { error, log, trace, warning } from './log';
-import { Report } from '../report';
-import { EventEmitter, TriggerService, TimeTrigger, OrderTrigger, PriceTrigger } from '../events';
-import { ReportCard } from '../report/widgets/report-card';
-import { ReportTable } from '../report/widgets/report-table';
-import { OrdersBasket } from '../exchange';
-import { ReportChart } from '../report/widgets/report-chart';
 import { BaseObject } from './base-object';
 import { getArgBoolean } from './base';
 import { BaseError } from './errors';
 
+type CacheObjectInfo = {
+  key: string;
+  className: string;
+  props: string[];
+  obj: object;
+  objId: string;
+};
+
 export class Storage extends BaseObject {
-  exceptProps = [];
   name = 'Storage';
   version = 9;
   _baseClasses = {
@@ -23,102 +23,176 @@ export class Storage extends BaseObject {
     RegExp: RegExp,
   };
 
+  objects: Record<string, CacheObjectInfo> = {};
+  state: Record<string, StateInfo> = {};
+  isActive = !isTester();
   isDebug = false;
+
+  stateKey = getPrefix() + '-global-storage';
 
   constructor(args: any = {}) {
     super(args);
-    try {
-      let { exceptProps, classes } = args;
-      if (exceptProps && Array.isArray(exceptProps)) {
-        this.exceptProps = [...this.exceptProps, ...exceptProps];
-      }
-      if (classes) {
-        classes.forEach((_class) => {
-          this.addClass(_class);
-        });
-      }
-    } catch (e) {
-      error('Storage::constructor', e.message, { e });
-    }
-    if (0) {
-      this.addClass(TriggerService);
-      this.addClass(TimeTrigger);
-      this.addClass(OrderTrigger);
-      this.addClass(PriceTrigger);
-      this.addClass(EventEmitter);
-      this.addClass(OrdersBasket);
-      this.addClass(Report);
-      this.addClass(ReportCard);
-      this.addClass(ReportTable);
-      this.addClass(ReportChart);
-    }
-    if (getArgBoolean('isDebugStorage', false)) {
-      this.isDebug = true;
+
+    if (!this.isActive) {
+      log('Storage::Constructor', 'Storage is inactive in tester mode');
     }
   }
 
-  async restoreState(key: string, obj: object, exceptProps: string[] = []) {
-    if (await this.dropState(key)) return;
+  addObject(key, obj: BaseObject | object, props = []) {
+    if (!this.isActive) return;
+    const objId = obj['id'] || null;
+    let info: CacheObjectInfo = {
+      key,
+      objId,
+      className: obj?.constructor?.name,
+      props,
+      obj,
+    };
 
+    this.objects[key] = info;
+
+    log('Storage:addObject', 'Object added ' + key, { key, objId, props });
+    if (this.state[key]) this.reStoreState(key, obj);
+  }
+
+  removeObject(key) {
+    let info = this.objects[key];
+    info.obj = undefined;
+    delete this.objects[key];
+
+    log('Storage:removeObject', 'Object removed', { key, info });
+  }
+
+  async init() {
+    if (!this.isActive) return;
+    await this.loadState();
+  }
+
+  private reStoreState(key: string, obj: object) {
     this.restoredPropsLevel1 = [];
     this.restoredPropsLevel2 = [];
 
-    let state = await this.loadState(key);
-    this.debug('Storage::restoreState', key, { state });
+    const state = this.state[key];
 
     if (!state) {
       warning('Storage::restoreState', 'state is empty for key ' + key);
       return;
     }
 
-    this.iterator = 0;
     this.applyState(state, obj);
 
-    log('Storage::restoreState', obj.constructor.name + ' is restored from key = ' + key, {
-      restoredPropsLevel1: this.restoredPropsLevel1,
-    });
+    log(
+      'Storage::restoreState',
+      obj.constructor.name + ' is restored from key = ' + key,
+      {
+        restoredPropsLevel1: this.restoredPropsLevel1,
+      },
+      true,
+    );
   }
 
-  async storeState(key: string, obj: object, exceptProps: string[] = [], onlyProps: string[] = []) {
-    this.statePropsInfoLv1 = [];
+  private getState(obj: object, i = 0, props = []): StateInfo {
+    if (!obj) return null;
 
-    if (!Array.isArray(exceptProps)) exceptProps = [];
+    let state: StateInfo = {
+      _c: 'unknown', // className
+      _p: {}, // properties
+      _v: null, //
+    };
+    i++;
 
-    if (Array.isArray(onlyProps) && onlyProps.length > 0) {
-      for (let prop of Object.keys(obj)) {
-        if (!onlyProps.includes(prop)) {
-          exceptProps.push(prop);
+    try {
+      state._c = obj.constructor.name;
+    } catch (e) {
+      error(e, { obj, lastPropName: this.lastPropName });
+      return null;
+    }
+
+    // //Map and Set
+    if (obj instanceof Map) {
+      state._v = this.getState(Object.fromEntries(obj.entries()), i);
+      return state;
+      // return this.getState();
+    }
+
+    if (obj instanceof Set) {
+      state._v = this.getState(Object.fromEntries(obj.entries()), i);
+      return state;
+    }
+
+    if (obj instanceof Array) {
+      state._v = obj;
+      return state;
+    }
+
+    if (obj instanceof Date) {
+      state._v = obj.toISOString();
+
+      return state;
+    }
+
+    let storeProps = props.length > 0 ? props : this.getOnlyProps(obj, []);
+
+    for (let propName of storeProps) {
+      this.lastPropName = propName;
+      if (propName.charAt(0) === '_') {
+        continue;
+      }
+      if (typeof obj[propName] === 'function' || obj[propName] === undefined) continue;
+
+      if (typeof obj[propName] === 'object') {
+        state._p[propName] = this.getState(obj[propName], i);
+      } else {
+        state._p[propName] = obj[propName];
+      }
+
+      if (i === 1) {
+        try {
+          this.statePropsInfoLv1.push(
+            obj.constructor.name +
+              '.' +
+              propName +
+              ':' +
+              (obj[propName]?.constructor ? obj[propName].constructor.name : obj[propName]),
+          );
+        } catch (e) {
+          error('Storage::getState', 'Fill getStatePropsLevel1 error - ' + e.message, { e, obj: obj, propName });
         }
       }
     }
 
-    let state = this.getState(obj, 0, exceptProps);
-    this.debug('Storage::storeState', key, { state });
-    let keyHour = key + '_hour' + new Date().getHours();
+    return state;
+  }
+  async storeState() {
+    if (isTester()) return false;
 
-    log('Storage::storeState', obj.constructor.name + ' is stored with key = ' + key, {
-      keyHour,
-      key,
-      getStatePropsLevel1: this.statePropsInfoLv1,
-    });
+    this.statePropsInfoLv1 = [];
+    const key = this.stateKey;
 
-    await this.saveState(keyHour, { updated: currentTimeString(), ...state });
+    for (let objInfo of Object.values(this.objects)) {
+      this.state[objInfo.key] = this.getState(objInfo.obj, 0, objInfo.props);
+    }
 
-    return await this.saveState(key, { updated: currentTimeString(), ...state });
+    let keyHour = key + '_h' + new Date().getHours();
+
+    await this.saveStateCache(keyHour, Object.keys(this.state));
+    warning('Storage::storeState', 'State is stored with key = ' + key, { state: this.state, keyHour, key }, true);
+
+    return await this.saveStateCache(key, this.state);
+  }
+
+  private async saveStateCache(key, state) {
+    try {
+      let strState = JSON.stringify(state);
+      return await setCache(key, strState);
+    } catch (e) {
+      error(e);
+      return false;
+    }
   }
 
   private debug(event, msg, params = {}) {
     if (this.isDebug) trace(event + '-debug', msg, params, true);
-  }
-
-  addClass(_class) {
-    let name = _class.name;
-
-    if (!name) {
-      throw new Error('Class name is empty');
-    }
-
-    this._baseClasses[name] = _class;
   }
 
   statePropsInfoLv1 = [];
@@ -135,14 +209,18 @@ export class Storage extends BaseObject {
 
   iterator = 0;
   propName = '';
-  restoredPropsLevel1 = [];
+  restoredPropsLevel1 = {};
   ignoredPropsLevel1 = [];
   restoredPropsLevel2 = [];
   applyStep = 0;
   private applyState(state: StateInfo, obj: object, i = 0) {
+    if (i == 0) this.restoredPropsLevel1 = {};
     let context = {};
 
     this.iterator++;
+    if (this.restoredPropsLevel1['l' + i] === undefined) this.restoredPropsLevel1['l' + i] = [];
+    const propsInfo = this.restoredPropsLevel1['l' + i];
+
     i++;
     let className;
 
@@ -180,7 +258,7 @@ export class Storage extends BaseObject {
         this.applyStep = 0;
         if (propName.charAt(0) === '_') {
           if (i === 1) {
-            this.restoredPropsLevel1.push(obj.constructor.name + '.' + propName + ' - IGNORED!');
+            propsInfo.push(obj.constructor.name + '.' + propName + ' - IGNORED!');
           }
           continue;
         }
@@ -205,21 +283,14 @@ export class Storage extends BaseObject {
             }
           }
           obj[propName] = this.applyState(objProps[propName], obj[propName], i);
-          // this.debug('Storage::applyState', 'class = ' + className + '  - FILED', { propName });
-
-          this.callAfterRestore(obj[propName]);
         } else {
           obj[propName] = objProps[propName]; //i = 9
         }
 
-        if (i === 1) {
-          if (obj[propName]) {
-            this.restoredPropsLevel1.push(
-              obj.constructor.name + '.' + propName + ': ' + obj[propName].constructor.name,
-            );
-          } else {
-            this.restoredPropsLevel1.push(obj.constructor.name + '.' + propName + ': ' + obj[propName]);
-          }
+        if (obj[propName]) {
+          propsInfo.push(`(${i}) ` + obj.constructor.name + '.' + propName + ': ' + obj[propName].constructor.name);
+        } else {
+          propsInfo.push(obj.constructor.name + '.' + propName + ': ' + obj[propName]);
         }
       }
     } catch (e) {
@@ -236,124 +307,38 @@ export class Storage extends BaseObject {
 
       throw new BaseError(e, { context });
     }
+
+    propsInfo.push(obj.constructor.name + '.afterReStore ' + typeof obj['afterReStore']);
+    this.callAfterRestore(obj);
     return obj;
   }
 
   callAfterRestore(obj: object) {
-    if (typeof obj['afterRestore'] === 'function') {
+    if (typeof obj['afterReStore'] === 'function') {
+      //log('Storage::callAfterRestore', '', { class: obj.constructor.name }, true);
       try {
-        obj['afterRestore']();
+        obj['afterReStore']();
       } catch (e) {
         error(e);
       }
     }
   }
 
-  private async saveState(key, state) {
+  private async loadState(): Promise<Record<string, StateInfo>> {
+    const key = this.stateKey;
+    let strState = '';
     try {
-      let strState = JSON.stringify(state);
-      return await setCache(key, strState);
-    } catch (e) {
-      error(e);
-      return false;
-    }
-  }
-
-  private async loadState(key) {
-    try {
-      let strState = await getCache<string>(key);
-      let state = JSON.parse(strState);
-      return state;
-    } catch (e) {
-      error(e);
-      return false;
-    }
-  }
-
-  private getState(obj: object, i = 0, exceptProps = []): StateInfo {
-    if (!obj) return null;
-
-    let state: StateInfo = {
-      _c: 'unknown', // className
-      _p: {}, // properties
-      _v: null, //
-    };
-    i++;
-
-    try {
-      state._c = obj.constructor.name;
-    } catch (e) {
-      error(e, { obj, lastPropName: this.lastPropName });
-      return null;
-    }
-    // if (!this.classes[state._className]) {
-    //   _trace('Storage::getState', 'not stored className ' + state._className, {});
-    //   return state;
-    // }
-
-    //TODO add check class exist in this.classes if not error
-
-    // //Map and Set
-    if (obj instanceof Map) {
-      state._v = this.getState(Object.fromEntries(obj.entries()), i);
-      return state;
-      // return this.getState();
-    }
-
-    if (obj instanceof Set) {
-      state._v = this.getState(Object.fromEntries(obj.entries()), i);
-      return state;
-    }
-
-    if (obj instanceof Array) {
-      state._v = obj;
-      return state;
-    }
-
-    if (obj instanceof Date) {
-      state._v = obj.toISOString();
-
-      return state;
-    }
-
-    // if (typeof obj === 'object' && typeof obj['beforeStore'] === 'function') {
-    //   try {
-    //     log('Storage::getState', 'beforeStore ', { objId: obj['id'] + '' }, true);
-    //     obj['beforeStore']();
-    //   } catch (e) {
-    //     error('Storage::getState', e.message + ' [beforeStore]', { e, objId: obj['id'] + '' });
-    //   }
-    // }
-
-    for (let propName of Object.keys(obj)) {
-      this.lastPropName = propName;
-      if (this.exceptProps.includes(propName) || propName.charAt(0) === '_' || exceptProps.includes(propName)) {
-        continue;
+      strState = await getCache<string>(key);
+      if (strState) {
+        this.state = JSON.parse(strState);
       }
-      if (typeof obj[propName] === 'function' || obj[propName] === undefined) continue;
-
-      if (typeof obj[propName] === 'object') {
-        state._p[propName] = this.getState(obj[propName], i);
-      } else {
-        state._p[propName] = obj[propName];
-      }
-
-      if (i === 1) {
-        try {
-          this.statePropsInfoLv1.push(
-            obj.constructor.name +
-              '.' +
-              propName +
-              ':' +
-              (obj[propName]?.constructor ? obj[propName].constructor.name : obj[propName]),
-          );
-        } catch (e) {
-          error('Storage::getState', 'Fill getStatePropsLevel1 error - ' + e.message, { e, obj: obj, propName });
-        }
-      }
+    } catch (e) {
+      error(e, { key, strState });
+      return {};
     }
+    log('Storage::loadState', 'State is loaded from key = ' + key, { stateKeys: Object.keys(this.state) }, true);
 
-    return state;
+    return this.state;
   }
 
   async get(key: string): Promise<any> {
@@ -367,6 +352,26 @@ export class Storage extends BaseObject {
   async getNumber(key: string): Promise<number> {
     return getCache(key);
   }
+
+  getOnlyProps(obj: object, exceptProps: string[]): string[] {
+    let onlyProps = [];
+    for (let prop of Object.keys(obj)) {
+      if (!exceptProps.includes(prop) && prop.charAt(0) !== '_') {
+        onlyProps.push(prop);
+      }
+    }
+    return onlyProps;
+  }
+
+  getExceptProps(obj: object, onlyProps: string[]): string[] {
+    let exceptProps = [];
+    for (let prop of Object.keys(obj)) {
+      if (!onlyProps.includes(prop) && prop.charAt(0) !== '_') {
+        exceptProps.push(prop);
+      }
+    }
+    return exceptProps;
+  }
 }
 
 type StateInfo = {
@@ -374,3 +379,54 @@ type StateInfo = {
   _p: Record<string, StateInfo>; // properties
   _v: any; //
 };
+
+// async restoreStateB(key: string, obj: object, exceptProps: string[] = []) {
+//   if (await this.dropState(key)) return;
+//
+//   this.restoredPropsLevel1 = [];
+//   this.restoredPropsLevel2 = [];
+//
+//   let state = await this.loadState(key);
+//   this.debug('Storage::restoreState', key, { state });
+//
+//   if (!state) {
+//     warning('Storage::restoreState', 'state is empty for key ' + key);
+//     return;
+//   }
+//
+//   this.iterator = 0;
+//
+//   this.applyState(state , obj);
+//
+//   log('Storage::restoreState', obj.constructor.name + ' is restored from key = ' + key, {
+//     restoredPropsLevel1: this.restoredPropsLevel1,
+//   });
+// }
+
+// private async storeStateB(key: string, obj: object, exceptProps: string[] = [], onlyProps: string[] = []) {
+//   this.statePropsInfoLv1 = [];
+//
+//   if (!Array.isArray(exceptProps)) exceptProps = [];
+//
+//   if (Array.isArray(onlyProps) && onlyProps.length > 0) {
+//     for (let prop of Object.keys(obj)) {
+//       if (!onlyProps.includes(prop)) {
+//         exceptProps.push(prop);
+//       }
+//     }
+//   }
+//
+//   let state = this.getState(obj, 0, exceptProps);
+//   this.debug('Storage::storeState', key, { state });
+//   let keyHour = key + '_hour' + new Date().getHours();
+//
+//   log('Storage::storeState', obj.constructor.name + ' is stored with key = ' + key, {
+//     keyHour,
+//     key,
+//     getStatePropsLevel1: this.statePropsInfoLv1,
+//   });
+//
+//   await this.saveStateCache(keyHour, { updated: currentTimeString(), ...state });
+//
+//   return await this.saveStateCache(key, { updated: currentTimeString(), ...state });
+// }

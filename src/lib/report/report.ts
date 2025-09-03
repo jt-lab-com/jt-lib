@@ -3,12 +3,13 @@ import { ChartType, ReportChart, ReportChartOptions } from './widgets/report-cha
 import { ReportCard, ReportCardParams } from './widgets/report-card';
 import { ReportActionButton } from './widgets/report-action-button';
 import { ReportText, TextOptions } from './widgets/report-text';
-import { error, getLogs, log, logOnce, warningOnce } from '../core/log';
+import { error, getLogs, log, logOnce, warning, warningOnce } from '../core/log';
 import { BaseObject } from '../core/base-object';
 import { AggType, ExtendedReportChartOptions } from './types';
 import { BaseError } from '../core/errors';
 
 import { getArgBoolean, getArgNumber } from '../core/base';
+import { validateNumbersInObject } from '../utils/numbers';
 
 /**
  * Report - provide functionality for create report of trading strategy. Report can be viewed in web interface.
@@ -64,7 +65,8 @@ export class Report extends BaseObject {
     if (!index && this._layoutIndexes[key]) {
       return;
     }
-    if (!index) {
+
+    if (typeof index == 'number') {
       index = this._layoutIterator = this._layoutIterator + 100;
     }
 
@@ -225,7 +227,7 @@ export class Report extends BaseObject {
           data: opResults,
         });
 
-        if (getArgBoolean('isMultiSymbols', false)) {
+        if (getArgNumber('testerMultiSymbols', 0) > 1 && getArgBoolean('withOptimizer', false) === false) {
           reportData.blocks.push(await this.fullReportChart.prepareDataToFullReport());
         }
         // reportData.blocks.push({
@@ -316,10 +318,16 @@ export class Report extends BaseObject {
     return undefined;
   }
 
-  createActionButton(title: string, action: string, value: string, layoutIndex: number = undefined) {
+  createActionButton(
+    title: string,
+    action: string,
+    value: string,
+    callback: (args?: { action?: string; value?: string }) => Promise<void> = undefined,
+    layoutIndex: number = undefined,
+  ) {
     if (this.actionButtons[title]) return;
 
-    this.actionButtons[title] = new ReportActionButton(title, action, value);
+    this.actionButtons[title] = new ReportActionButton(title, action, value, callback);
 
     if (this.isSetLayoutIndexByDefault) {
       this.setLayoutIndex('actionButton', title, layoutIndex);
@@ -497,10 +505,16 @@ export class Report extends BaseObject {
     this.deleteLayoutIndex('text', textName);
   }
 
-  async updateReport(args = {}) {
-    try {
-      this.lastTimeUpdate = Date.now();
+  _lastUpdated = 0;
+  async updateReport(args: any = {}) {
+    if (args && args?.isForce && isTester()) args.isForce = false; // no force update in tester !important
+    if (args?.isForce === true && this._lastUpdated && Date.now() - this._lastUpdated < 900) {
+      warning('Report::updateReport', 'Report updated too often, ignoring', { lastUpdated: this._lastUpdated });
+      return;
+    }
 
+    this._lastUpdated = Date.now();
+    try {
       this._reportData = {
         id: getArtifactsKey(),
         symbol: this.symbol,
@@ -509,11 +523,13 @@ export class Report extends BaseObject {
       };
 
       if (this.title) {
-        this._reportData.blocks.push(new ReportText(this.title, 'h1', 'center').prepareDataToReport());
+        // this._reportData.blocks.push(new ReportText(this.title, 'h1', 'center').prepareDataToReport());
+        this._reportData.blocks.push(ReportText.getBlock(this.title, 'h1', 'center'));
       }
 
       if (this.description) {
-        this._reportData.blocks.push(new ReportText(this.description, 'subtitle1', 'center').prepareDataToReport());
+        //this._reportData.blocks.push(new ReportText(this.description, 'subtitle1', 'center').prepareDataToReport());
+        this._reportData.blocks.push(ReportText.getBlock(this.description, 'subtitle1', 'center'));
       }
 
       //----------------TEXTS
@@ -595,8 +611,6 @@ export class Report extends BaseObject {
         });
       }
 
-
-
       let logs = getLogs('error');
 
       if (logs.length > 0) {
@@ -641,7 +655,6 @@ export class Report extends BaseObject {
           data: logs.slice(0, 200),
         });
       }
-
 
       //Multi-symbols report chart for full report
       if (getArgNumber('testerMultiSymbols', 0) > 1 && getArgBoolean('withOptimizer', false) === false) {

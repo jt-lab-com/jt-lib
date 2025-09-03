@@ -1,5 +1,5 @@
 import { BaseObject } from '../core/base-object';
-import { EventListener, TickExecutionData } from './types';
+import { EventListener, TickExecutionData, TickEventName, EventName, GetEventData, TypedEventHandler } from './types';
 import { uniqueId } from '../core/base';
 import { BaseError } from '../core/errors';
 import { error, log, warning } from '../core/log';
@@ -18,11 +18,11 @@ export class EventEmitter extends BaseObject {
   }
 
   subscribeOnOrderChange(handler: (order: Order) => Promise<any>, owner: BaseObject, symbol: string) {
-    return this.subscribe(`onOrderChange_${symbol}`, handler, owner);
+    return this.subscribe(`onOrderChange_${symbol}` as `onOrderChange_${string}`, handler, owner);
   }
 
-  subscribeOnTick(handler: (data?: any) => Promise<any>, owner: BaseObject, symbol: string, interval?: number) {
-    let event = isTester() ? 'onTick' : `onTick_${symbol}`;
+  subscribeOnTick(handler: (data?: undefined) => Promise<any>, owner: BaseObject, symbol: string, interval?: number) {
+    const event: TickEventName = isTester() ? 'onTick' : `onTick_${symbol}`;
 
     if (!interval) {
       interval = this.defaultTickInterval;
@@ -30,13 +30,13 @@ export class EventEmitter extends BaseObject {
 
     interval = Math.max(interval, this.defaultTickInterval);
 
-    this.tickExecInterval.set(event, {
+    this.tickExecInterval.set(event as string, {
       interval,
       symbol,
       nextTick: timeCurrent() + interval,
     });
 
-    let result = this.subscribe(event, handler, owner);
+    let result = this.subscribe(event as EventName, handler, owner);
 
     return result;
   }
@@ -49,7 +49,7 @@ export class EventEmitter extends BaseObject {
    * @param owner - object witch has this listener (for unsubscribing by object)
    * @returns {string} - listener id (for unsubscribing by id)
    */
-  subscribe(eventName: string, handler: (data?: any) => Promise<any>, owner: BaseObject): string {
+  subscribe<T extends EventName>(eventName: T, handler: TypedEventHandler<T>, owner: BaseObject): string {
     //TODO EventEmitter::subscribe() - check if object subscribed twice to the same event with the same handler (it will be a memory leak and problems with unsubscribing)
 
     if (eventName === 'onBeforeTick' || eventName === 'onAfterTick') {
@@ -122,7 +122,7 @@ export class EventEmitter extends BaseObject {
   }
 
   async emitOnOrderChange(order: Order) {
-    await this.emit(`onOrderChange_${order.symbol}`, order);
+    await this.emit(`onOrderChange_${order.symbol}` as `onOrderChange_${string}`, order);
   }
 
   async emitOnTick() {
@@ -134,14 +134,18 @@ export class EventEmitter extends BaseObject {
 
     for (const [event, execData] of this.tickExecInterval.entries()) {
       if (tms(execData.symbol) >= execData.nextTick) {
-        await this.emit(event);
+        await this.emit(event as EventName);
         execData.nextTick = tms(execData.symbol) + execData.interval;
       }
     }
     await this.emit('onTick');
   }
 
-  async emit(eventName: string, data?: any, listeners: EventListener[] = []): Promise<void> {
+  async emit<T extends EventName>(
+    eventName: T,
+    data?: GetEventData<T>,
+    listeners: EventListener[] = [],
+  ): Promise<void> {
     if (listeners.length === 0) {
       listeners = this._listeners.get(eventName);
       if (!listeners || !listeners.length) return;

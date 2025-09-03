@@ -6,8 +6,6 @@ import { ChartType } from '../widgets/report-chart';
 import { getArgBoolean, getArgString } from '../../core/base';
 import { abs, max, min, normalize, numberToCurrency, validateNumbersInObject } from '../../utils/numbers';
 
-
-
 export class StandardReportLayout extends BaseObject {
   version = '2.08';
 
@@ -83,6 +81,12 @@ export class StandardReportLayout extends BaseObject {
     this._startDate = currentTime();
 
     globals.report.createChart('Profit/Drawdown', { chartType: ChartType.Area });
+
+    //set default Title and description
+    if (globals.strategy) {
+      if (!globals.strategy['name']) globals.report.setTitle(globals.strategy['name']);
+      if (!globals.strategy['description']) globals.report.setDescription(globals.strategy['description']);
+    }
   }
 
   updateReport = async (args) => {
@@ -145,7 +149,7 @@ export class StandardReportLayout extends BaseObject {
           volumeUsd += order.price * order.amount;
         }
       }
-      let recoveryFactor = this.maxUpl ? (await getProfit()) / abs(this.maxUpl ): 'n/a';
+      let recoveryFactor = this.maxUpl ? (await getProfit()) / abs(this.maxUpl) : 'n/a';
 
       // global.report.optimizedSetValue('Fee calc', feeCalc);
       globals.report.cardSetValue('Symbol', ARGS.symbol);
@@ -176,7 +180,7 @@ export class StandardReportLayout extends BaseObject {
         }
       }
 
-      let testedDays = normalize((tms()-this._startDate) / 1000 / 60 / 60 / 24, 0);
+      let testedDays = normalize((tms() - this._startDate) / 1000 / 60 / 60 / 24, 0);
       globals.report.optimizedSetValue('Days', testedDays);
       globals.report.optimizedSetValue('Spend (min)', this.getTesterSpend());
 
@@ -193,7 +197,6 @@ export class StandardReportLayout extends BaseObject {
       let secSpend = normalize((this.endTimeTester - this.startTimeTester) / 1000, 0);
 
       //
-
 
       log(
         'ProReportLayout::onStopTester',

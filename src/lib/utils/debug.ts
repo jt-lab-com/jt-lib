@@ -9,7 +9,6 @@ export function objectFindPromise(obj: any): string[] {
     !!v && (typeof v === 'object' || typeof v === 'function') && typeof (v as any).then === 'function';
 
   const walk = (value: any, path: string) => {
-
     if (isPromise(value)) {
       paths.push(path || '');
       return;
@@ -29,9 +28,7 @@ export function objectFindPromise(obj: any): string[] {
       return;
     }
 
-
     const keys = objectGetAllProperties(value);
-    //log('objectFindPromise', 'walk', { id:value.id, class: value.constructor.name, path , keys},true);
     for (const key of keys) {
       try {
         walk(value[key], path ? `${path}.${key}` : key);
@@ -45,13 +42,11 @@ export function objectFindPromise(obj: any): string[] {
   return paths;
 }
 
-
 export function objectFindInvalidNumbers(obj: any): string[] {
   const paths: string[] = [];
   const seen: any[] = [];
 
-  const isInvalidNumber = (v: any): v is number =>
-    typeof v === 'number' && !Number.isFinite(v); // true для NaN, +Infinity, -Infinity
+  const isInvalidNumber = (v: any): v is number => typeof v === 'number' && !Number.isFinite(v); // true для NaN, +Infinity, -Infinity
 
   const walk = (value: any, path: string) => {
     if (isInvalidNumber(value)) {

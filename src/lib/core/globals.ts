@@ -8,9 +8,8 @@ import { Indicators } from '../indicators';
 import { getArgBoolean, getArgNumber } from './base';
 import { BaseScript } from '../script/base-script';
 
-
 class GlobalScope {
-  private _strategy: BaseScript = null;
+  private _script: BaseScript = null;
   private _triggers: TriggerService = null;
   private _report: Report = null;
   private _events: EventEmitter = null;
@@ -39,7 +38,7 @@ class GlobalScope {
 
     this.IS_NO_LOGS = getArgNumber('isNoLogs', 0); // 0 - logs are enabled, 1 - logs are disabled
 
-    if(this.IS_NO_LOGS) console.warn("GlobalScope::constructor LOGS is disabled IS_NO_LOGS = 1");
+    if (this.IS_NO_LOGS) console.warn('GlobalScope::constructor LOGS is disabled IS_NO_LOGS = 1');
 
     this.isDebug = getArgBoolean('isDebug', false);
   }
@@ -69,12 +68,12 @@ class GlobalScope {
     return this._isTradeAllowed;
   }
 
-  set strategy(strategy) {
-    this._strategy = strategy;
+  set script(strategy) {
+    this._script = strategy;
   }
 
-  get strategy() {
-    return this._strategy;
+  get script() {
+    return this._script;
   }
 
   set candlesBufferService(service: CandlesBufferService) {

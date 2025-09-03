@@ -2,7 +2,11 @@ import { BaseIndicator } from './base-indicator';
 import { abs, validateNumbersInObject } from '../utils/numbers';
 import { CandlesBuffer } from '../candles';
 import { globals } from '../core/globals';
-import { log } from '../core/log';
+
+import { MaBuffer } from './utils/ma-buffer';
+import { BaseError } from '../core/errors';
+import { timeCurrent, timeToString } from '../utils/date-time';
+import { roundTimeByTimeframe } from '../utils/timeframe';
 
 interface AverageTrueRangeOptions {
   symbol: string;
@@ -12,73 +16,70 @@ interface AverageTrueRangeOptions {
 
 export class AverageTrueRange extends BaseIndicator {
   private readonly period: number;
-  private firstValue = 0;
   private lastIndex = 0;
 
   private lastTimeUpdated = 0;
   private trSum = 0;
-  private firstTR = 0;
+  private firstTRInWindow = 0;
+
+  avg: MaBuffer;
 
   constructor(buffer: CandlesBuffer, options: AverageTrueRangeOptions) {
     super(options.symbol, options.timeframe, buffer);
+    if (!options.period || options.period < 1) {
+      throw new BaseError('ATR: period must be >1', { buffer, options });
+    }
     this.period = options.period;
+    this.avg = new MaBuffer(this.period);
+  }
+
+  private trueRange(c: Candle) {
+    // const hl = c.high - c.low;
+    // const hc = abs(c.high - prevClose);
+    // const lc = abs(c.low - prevClose);
+    return abs(c.high - c.low);
   }
 
   protected onCalculate() {
     const candles = this.candlesBuffer.getCandles();
+    if (candles.length < this.period + 1) return { msg: 'Not enough candles to calculate' };
 
-    if (this.lastTimeUpdated >= this.candlesBuffer.getLastTimeUpdated()) return;
-    if (candles.length < this.period) return;
+    const cTime = roundTimeByTimeframe(timeCurrent(), this.timeframe);
+    const lastCandleTime = candles[candles.length - 1].timestamp; // get last full candle timestamp
 
-    if (this.lastIndex === 0) {
-      this.firstTR = abs(candles[0].close - candles[1].close);
+    if (cTime === lastCandleTime) {
+      return { msg: 'No calculate on current candle ', lastCandleTime, cTime };
+    }
 
-      for (let i = 1; i < this.period; i++) {
-        //validateNumbersInObject({ close: candles[i - 1].close, close2: candles[i].close });
-        this.trSum += abs(candles[i - 1].close - candles[i].close);
+    try {
+      for (let i = this.lastIndex; i < candles.length - 1; i++) {
+        // ! candles.length -1 because calculate only on full candles
+        const tr = this.trueRange(candles[i]);
+        this.avg.addValue(tr);
+        if (i >= this.period) {
+          this.buffer.push({ timestamp: candles[i].timestamp, value: this.avg.getValue() });
+        }
       }
-
-      this.lastIndex = this.period - 1;
-      const atr = this.trSum / this.period;
-
-      validateNumbersInObject({ atr, trSum: this.trSum });
-      this.buffer.push({ timestamp: candles[this.period - 1].timestamp, value: atr });
-      log(
-        'calculate ',
-        'pre calc values',
-        { atr, lastIndex: this.lastIndex, period: this.period, trSum: this.trSum },
-        true,
-      );
+      this.lastIndex = candles.length - 1;
+      this.lastTimeUpdated = lastCandleTime;
+    } catch (e) {
+      throw new BaseError(e, {
+        candlesLength: candles.length,
+        period: this.period,
+        lastIndex: this.lastIndex,
+        lastTimeUpdated: this.lastTimeUpdated,
+      });
     }
-    const startIndex = this.lastIndex + 1;
-
-    for (let i = startIndex; i < candles.length; i++) {
-      const tr = abs(candles[i - 1].close - candles[i].close);
-      this.trSum = this.trSum - this.firstTR + tr;
-      this.firstTR = abs(candles[i - this.period].close - candles[i - this.period + 1].close);
-
-      const atr = this.trSum / this.period;
-
-      this.buffer.push({ timestamp: candles[i].timestamp, value: atr });
-      this.lastTimeUpdated = candles[i].timestamp;
-      this.lastIndex = i;
-      globals.report.chartAddPointAgg('Chart+', 'TR', tr, 'max');
-    }
-
-    globals.report.chartAddPointAgg('Chart+', 'SumTR', this.trSum);
-    globals.report.chartAddPointAgg('Chart+', 'FirsTr', this.firstTR, 'max');
   }
 
   getIndicatorValues() {
-    if (!this.buffer.length) {
-      this.onCalculate();
-    }
-
+    if (!this.buffer.length) this.onCalculate();
     return this.buffer;
   }
 
-  getValue(shift: number = 0): number {
+  getValue(shift = 0): number {
     this.onCalculate();
-    return this.buffer[this.lastIndex - this.period - 1 - shift]?.value;
+    const idx = this.buffer.length - 1 - shift;
+    return idx >= 0 ? this.buffer[idx]?.value : undefined;
   }
 }

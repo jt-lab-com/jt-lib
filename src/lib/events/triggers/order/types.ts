@@ -18,6 +18,7 @@ interface CreateTaskBaseParams {
   retry?: boolean | number;
   comment?: string;
   group?: string;
+  canReStore?: boolean;
 }
 
 interface OrderIdFields {
