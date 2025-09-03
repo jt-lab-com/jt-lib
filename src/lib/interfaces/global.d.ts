@@ -6,19 +6,20 @@ declare global {
   /// <reference path="tick.interface.ts" />
   /// <reference path="candle.interface.ts" />
   type GlobalARGS = {
-    exchange: string;
-    start: string; //"2021-01"
-    end: string; //"2021-12"
-    startDate: Date; //"2021-01-01T00:00:00.000Z"
-    endDate: Date; // "2021-12-31T23:59:59.999Z"
-    symbol: string;
-    timeframe: string;
-    optimizerIteration: number;
-    makerFee: number;
-    takerFee: number;
-    marketOrderSpread: number;
-    balance: number;
-    leverage: number;
+    connectionName: string;
+    symbols: string; // "BTC/USDT,ETH/USDT"
+    symbol: string; //"BTC/USDT"
+    start: string; //"2021-01"  // tester only
+    end: string; //"2021-12"  // tester only
+    startDate: Date; //"2021-01-01T00:00:00.000Z" tester only
+    endDate: Date; // "2021-12-31T23:59:59.999Z" tester only
+    timeframe: string; // tester only
+    optimizerIteration: number; // tester only
+    makerFee: number; // tester only
+    takerFee: number; // tester only
+    marketOrderSpread: number; // tester only
+    balance: number; // tester only
+    leverage: number; // tester only
   } & Record<string, string | number | boolean>;
 
   const ARGS: GlobalARGS;

@@ -507,6 +507,7 @@ export class Report extends BaseObject {
 
   _lastUpdated = 0;
   async updateReport(args: any = {}) {
+    if (args && args?.isForce && isTester()) args.isForce = false; // no force update in tester !important
     if (args?.isForce === true && this._lastUpdated && Date.now() - this._lastUpdated < 900) {
       warning('Report::updateReport', 'Report updated too often, ignoring', { lastUpdated: this._lastUpdated });
       return;
