@@ -55,7 +55,7 @@ export function shortProfitPercent(entryPrice: number, closePrice: number): numb
  * @returns {number} - profit percent
  * @example positionProfit('long', 100, 200, 1)  returns 100
  */
-//TODO add contractSize
+
 export function positionProfit(
   side: string, // 'long' | 'short' | 'buy' | 'sell',
   entryPrice: number,

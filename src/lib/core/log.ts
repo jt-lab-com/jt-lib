@@ -4,7 +4,7 @@ import { getArgBoolean } from './base';
 import { BaseError } from './errors';
 
 const LOG_MAX_MESSAGES = 200;
-const MAX_CONSOLE_LOG = 500;
+const MAX_CONSOLE_LOG = 200;
 const IS_DEBUG = getArgBoolean('isDebug', false);
 const IS_STRINGIFY = getArgBoolean('isStringifyLogs', true);
 
@@ -83,14 +83,14 @@ export function error(...args: any): void {
     if (globals.errorCount > 20) {
       let errCnt = globals.errorCount;
       globals.errorCount = 0;
-      globals.strategy.forceStop('Too many errors count=' + errCnt);
+      globals.script.forceStop('Too many errors count=' + errCnt);
     }
   } else {
     if (globals.errorCount > 10) {
       let errCnt = globals.errorCount;
 
       globals.errorCount = 0;
-      globals.strategy.forceStop('Too many errors count =' + errCnt);
+      globals.script.forceStop('Too many errors count =' + errCnt);
     }
     if (globals.lastErrorTime + 60 * 60 * 1000 > currentTime()) {
       globals.errorCount = 0;
@@ -190,8 +190,8 @@ function _updateLog(
     globals.consoleLogCount++;
     if (globals.consoleLogCount > MAX_CONSOLE_LOG) {
       console.error('Too many console.log() calls. Max count = ' + MAX_CONSOLE_LOG);
-      //todo ADD reason argument to forceStop();
-      forceStop();
+
+      globals.script.forceStop('Too many console.log() calls. Max count = ' + MAX_CONSOLE_LOG);
     }
   }
 

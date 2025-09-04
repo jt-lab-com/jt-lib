@@ -18,6 +18,7 @@ export interface TriggerTask {
   comment?: string;
   result?: any;
   error?: string;
+  canReStore?: boolean;
 }
 
 export type TaskType = 'price' | 'time' | 'order';

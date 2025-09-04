@@ -1,7 +1,7 @@
 import { roundTimeByTimeframe, convertTimeframeToString, convertTimeframeToNumber } from '../utils/timeframe';
 import { error, log, trace, warning } from '../core/log';
 import { globals } from '../core/globals';
-import { currentTime, timeToString } from '../utils/date-time';
+import { currentTime, timeCurrent, timeToString } from '../utils/date-time';
 import { BaseObject } from '../core/base-object';
 
 export interface CandlesBufferOptions {
@@ -18,13 +18,13 @@ export class CandlesBuffer extends BaseObject {
   private readonly preloadCandlesCount: number;
   private readonly maxBufferLength: number;
   private isInitialized = false;
-  private buffer = [];
+  private buffer: Candle[] = [];
   private lastTimeUpdated = null;
   private currentCandle: Candle = null;
 
   constructor(options: CandlesBufferOptions) {
     super();
-    const { timeframe, maxBufferLength = 1000, symbol, preloadCandlesCount = 200 } = options;
+    const { timeframe, maxBufferLength = 1000, symbol, preloadCandlesCount = 250 } = options;
     this.timeframeString = convertTimeframeToString(timeframe);
     this.timeframeNumber = convertTimeframeToNumber(timeframe);
 
@@ -50,7 +50,7 @@ export class CandlesBuffer extends BaseObject {
     const startTime = startTimestamp - this.preloadCandlesCount * this.timeframeNumber * 1000 * 60;
 
     try {
-      const history = await getHistory(this.symbol, this.timeframeString, startTime, this.preloadCandlesCount);
+      const history = await getHistory(this.symbol, this.timeframeString, startTime, this.preloadCandlesCount + 1);
 
       trace('CandlesBuffer:init', 'history', {
         count: history.length,
@@ -61,7 +61,7 @@ export class CandlesBuffer extends BaseObject {
         preloadCandlesCount: this.preloadCandlesCount,
       });
 
-      if (this.buffer.length > 0) {
+      if (history.length > 0) {
         this.buffer = history.map(([timestamp, open, high, low, close]) => ({
           timestamp,
           open,
@@ -69,6 +69,8 @@ export class CandlesBuffer extends BaseObject {
           low,
           close,
         }));
+
+        this.lastTimeUpdated = this.buffer[this.buffer.length - 1].timestamp;
 
         this.isInitialized = true;
         log('CandlesBuffer:init', `Candles buffer initialized for symbol ${this.symbol}`, {
@@ -93,9 +95,10 @@ export class CandlesBuffer extends BaseObject {
   }
 
   private async updateBuffer() {
-    this.lastTimeUpdated = tms();
+    //TODO change timeCurrent to tms(this.symbol) but after tms() will be return time in onInit in tester
+    this.lastTimeUpdated = timeCurrent();
 
-    const candleTimestamp = roundTimeByTimeframe(tms(this.symbol), this.timeframeNumber);
+    const candleTimestamp = roundTimeByTimeframe(timeCurrent(), this.timeframeNumber);
     const currentPrice = close(this.symbol);
 
     if (!this.currentCandle) {
@@ -141,5 +144,24 @@ export class CandlesBuffer extends BaseObject {
 
   getLastTimeUpdated() {
     return this.lastTimeUpdated;
+  }
+
+  close() {
+    return this.buffer[this.buffer.length - 1].close;
+  }
+  high() {
+    return this.buffer[this.buffer.length - 1]?.high;
+  }
+  low() {
+    return this.buffer[this.buffer.length - 1]?.low;
+  }
+  open() {
+    return this.buffer[this.buffer.length - 1]?.open;
+  }
+  volume() {
+    return this.buffer[this.buffer.length - 1]?.volume;
+  }
+  tms() {
+    return this.buffer[this.buffer.length - 1]?.timestamp;
   }
 }

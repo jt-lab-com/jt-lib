@@ -6,9 +6,7 @@ import { BaseObject } from '../core/base-object';
 import { Storage } from '../core/storage';
 import { getArgBoolean, getArgString } from '../core/base';
 import { BaseError } from '../core/errors';
-import { normalize } from '../utils/numbers';
 import { CandlesBufferService } from '../candles';
-import { errorContext } from '../utils/errors';
 import { Indicators } from '../indicators';
 
 export class BaseScript extends BaseObject {
@@ -47,10 +45,10 @@ export class BaseScript extends BaseObject {
     } else {
       //TODO make symbolsInfo available in constructor
       if (!this.symbols?.length) {
-        const symbol = '';
-        const symbolsLine = getArgString('symbols', '');
+        let symbol = '';
+        let symbolsLine = getArgString('symbols', '');
 
-        const symbols = symbolsLine.split(',');
+        let symbols = symbolsLine.split(',');
         symbols.forEach((symbol) => {
           if (symbol.includes('/')) {
             this.symbols.push(symbol.trim());
@@ -68,7 +66,8 @@ export class BaseScript extends BaseObject {
     }
 
     const idPrefix = 'Global'; //
-    globals.strategy = this;
+    globals.script = this;
+
     globals.events = new EventEmitter({ idPrefix });
     globals.triggers = new TriggerService({ idPrefix });
     globals.report = new Report({ idPrefix });
@@ -107,17 +106,18 @@ export class BaseScript extends BaseObject {
 
   protected async init() {
     try {
-      const balanceInfo = await getBalance();
+      await globals.storage.init();
+      let balanceInfo = await getBalance();
       this.balanceTotal = balanceInfo.total.USDT;
       this.balanceFree = balanceInfo.free.USDT;
       log('BaseScript::init', 'getBalance', balanceInfo, true);
     } catch (e) {
-      throw errorContext(e, {});
+      throw new BaseError(e, {});
     } finally {
       this.isInitialized = false;
     }
 
-    const initInfo = {
+    let initInfo = {
       balanceTotal: this.balanceTotal,
       balanceFree: this.balanceFree,
       symbols: this.symbols,
@@ -129,7 +129,8 @@ export class BaseScript extends BaseObject {
       this.isInitialized = true;
       await this.onInit();
     } catch (e) {
-      throw errorContext(e, {});
+      error(e);
+      throw new BaseError(e, {});
     } finally {
       this.isInitialized = false;
     }
@@ -147,7 +148,6 @@ export class BaseScript extends BaseObject {
     this._isTickLocked = true;
     try {
       //TODO delete all   await globals.events.emit('onBeforeTick');    await globals.events.emit('onAfterTick');
-
       // await this.onBeforeTick();
       //  await globals.events.emit('onBeforeTick');
       await this.onTick(data);
@@ -223,13 +223,19 @@ export class BaseScript extends BaseObject {
 
   protected runOnError = async (e: any) => {
     if (this.isStop) {
+      try {
+        await this.stop();
+      } catch (error) {
+        console.log('BaseScript:runOnError ' + error.message, error.stack);
+      }
       throw e;
     }
-    error(e);
+    error(e, { isStop: this.isStop });
   };
 
   protected runArgsUpdate = async (args: GlobalARGS) => {
     try {
+      if (getArgBoolean('isDebug', false)) globals.isDebug = true;
       await this.onArgsUpdate(args);
       await globals.events.emit('onArgsUpdate', args);
     } catch (e) {
@@ -265,18 +271,17 @@ export class BaseScript extends BaseObject {
     } catch (e) {
       await this.runOnError(e);
     }
-    this._testerEndRealTime = Date.now();
-    //  if (isTester()) {
-    const min = normalize((this._testerEndRealTime - this._testerStartRealTime) / 1000 / 60, 0);
-    const sec = normalize((this._testerEndRealTime - this._testerStartRealTime) / 1000, 0);
-    log('Script:stop', `Tester spend ${min}:${sec}`, {}, true);
-    //}
+    try {
+      await globals.storage.storeState();
+    } catch (e) {
+      error(e, {});
+    }
   }
 
-  protected async runOnReportAction(action: string, payload: any) {
+  protected async runOnReportAction(action: string, value: any) {
     try {
-      await this.onReportAction(action, payload);
-      await globals.events.emit('onReportAction', { action, payload });
+      await this.onReportAction(action, value);
+      await globals.events.emit('onReportAction', { action, value });
     } catch (e) {
       await this.runOnError(e);
     }
