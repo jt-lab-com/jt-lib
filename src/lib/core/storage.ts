@@ -40,18 +40,19 @@ export class Storage extends BaseObject {
 
   addObject(key, obj: BaseObject | object, props = []) {
     if (!this.isActive) return;
+    const className = obj?.constructor?.name;
     const objId = obj['id'] || null;
     let info: CacheObjectInfo = {
       key,
       objId,
-      className: obj?.constructor?.name,
+      className,
       props,
       obj,
     };
 
     this.objects[key] = info;
 
-    log('Storage:addObject', 'Object added ' + key, { key, objId, props });
+    log('Storage:addObject', 'Object added ' + key, { className, key, objId, props });
     if (this.state[key]) this.reStoreState(key, obj);
   }
 

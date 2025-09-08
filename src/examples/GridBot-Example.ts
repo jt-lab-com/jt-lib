@@ -8,24 +8,31 @@ import { percentDifference } from '../lib/utils/numbers';
 import { BaseError } from '../lib/core/errors';
 
 /*
-Multi-coin grid strategy example.
-Strategy logic is based in the GridBasket class.
+Grid Bot - Multi-Symbol Grid Trading Strategy
 
-Parameters:
- sizeUsd - size of first opening order in USD.
- gridStepPercent - step between orders in percent.
- minProfitPercent - profit percent to fix profit and close position all.
+WHAT IT DOES:
+Creates a "grid" of buy orders below current price. When price drops, orders execute and increase position size.
+When price goes back up, sells everything for profit and starts over.
 
-Strategy:
+HOW IT WORKS:
+1. Buy at market price
+2. Place limit buy orders every 5% down (gridStepPercent)
+3. If price drops: limit orders fill, position gets bigger
+4. If price rises 2% (tpPercent): sell everything for profit
+5. Start new round
 
-1. Create a basket for each symbol.
-2. Start new round -> open long position with market order with sizeUsd.
-3. Create limit orders with gridStepPercent.
+PARAMETERS:
+- symbols: trading pairs (default: 10 major coins)
+- sizeUsd: position size in dollars (default: 100$)
+- gridStepPercent: grid spacing in % (default: 5%)
+- tpPercent: profit target in % (default: 2%)
 
-After that, we have 2 ways
-  a. - Price goes up and we have profit and close round.
-  b. - Price goes down and we open new orders with gridStepPercent and wait for price to go up again and close round.
-
+EXAMPLE:
+- Buy 0.002 BTC at $50,000
+- Place limit order at $47,500 (5% down)
+- If price hits $47,500: buy another 0.002 BTC (now 0.004 total)
+- If price goes back to $49,000: sell all 0.004 BTC for profit
+- Start over
 */
 
 class Script extends BaseScript {
@@ -90,14 +97,15 @@ class Script extends BaseScript {
 }
 
 /**
- * GridBasket - Implements grid trading strategy
- *
- * Grid strategy works by:
- * 1. Opening a long position at market price
- * 2. Placing limit buy orders below current price at regular intervals
- * 3. When price moves up, closing position for profit
- * 4. When price moves down, limit orders execute, increasing position size
- * 5. When price recovers, closing larger position for profit
+ * GridBasket - Handles grid trading for one symbol
+ * 
+ * SIMPLE WORKFLOW:
+ * 1. Buy at market price
+ * 2. Place limit buy order 5% below current price
+ * 3. If price drops: limit order fills, position doubles
+ * 4. Place new limit order 5% below new price
+ * 5. If price rises 2%: sell everything for profit
+ * 6. Start over
  */
 export class GridBasket extends OrdersBasket {
   // Strategy parameters
@@ -121,7 +129,7 @@ export class GridBasket extends OrdersBasket {
 
   /**
    * Start a new trading round
-   * Opens initial long position and sets up grid orders
+   * Buy at market price and place first limit order below
    */
   async newRound() {
     // Open initial long position at market price
@@ -147,8 +155,7 @@ export class GridBasket extends OrdersBasket {
   };
 
   /**
-   * Called on every price tick
-   * Checks if take profit condition is met
+   * Check if we made enough profit to close position
    */
   async onTick() {
     const position = await this.getPositionBySide('long');
@@ -160,8 +167,7 @@ export class GridBasket extends OrdersBasket {
   }
 
   /**
-   * Called when order status changes
-   * Creates new grid orders when limit orders are filled
+   * When limit order fills, place next grid order below
    */
   async onOrderChange(order: Order) {
     // When a limit buy order is filled (not a reduce-only order)
@@ -172,8 +178,7 @@ export class GridBasket extends OrdersBasket {
   }
 
   /**
-   * Create a limit buy order at grid step below current price
-   * This order will execute if price drops, increasing position size
+   * Place limit buy order 5% below current price
    */
   async createLimitByStep() {
     // Calculate trigger price (grid step below current price)
