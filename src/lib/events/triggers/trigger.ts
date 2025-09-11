@@ -54,7 +54,7 @@ export abstract class Trigger extends BaseObject {
 
   afterReStore() {
     const className = this.constructor.name;
-    log('Trigger::afterReStore', 'restoring tasks from storage', { storageTasks: this.storageTasks, className }, true);
+    log('Trigger::afterReStore', 'restoring tasks from storage', { storageTasks: this.storageTasks, className });
     if (this.storageTasks?.length) {
       for (const task of this.storageTasks) {
         this.addTask(task);

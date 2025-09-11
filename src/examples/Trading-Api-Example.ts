@@ -5,6 +5,7 @@ import { getArgNumber } from '../lib/core/base';
 import { OrdersBasket } from '../lib/exchange';
 import { BaseScript } from '../lib/script/base-script';
 import { sleep } from '../lib/utils/misc';
+import { StandardReportLayout } from '../lib/report/layouts';
 
 /*
 Trading API Callback Example
@@ -48,6 +49,7 @@ class Script extends BaseScript {
   sizeUsd: any;
   symbol: string;
   orderBasket: OrdersBasket;
+  private reportLayout: StandardReportLayout;
 
   constructor(params: GlobalARGS) {
     super(params);
@@ -76,8 +78,8 @@ class Script extends BaseScript {
       },
     );
 
+    this.reportLayout = new StandardReportLayout();
     await this.createButtonsWithCallbacks();
-    await globals.report.updateReport();
   };
 
   async onOrderChange(order: Order): Promise<void> {
@@ -347,18 +349,10 @@ class Script extends BaseScript {
     await globals.report.updateReport();
   }
 
-  async onTick(data) {
+  async onTick() {
     globals.report.cardSetValue('Price', this.orderBasket.price());
     globals.report.cardSetValue('Bid', this.orderBasket.bid());
     globals.report.cardSetValue('Ask', this.orderBasket.ask());
     globals.report.cardSetValue('Time', timeToStrHms(tms()));
-
-    if (this.iterator % 5 === 0) {
-      await globals.report.updateReport();
-    }
   }
-
-  onStop = async () => {
-    await globals.report.updateReport();
-  };
 }

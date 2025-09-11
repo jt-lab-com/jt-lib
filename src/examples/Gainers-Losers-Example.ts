@@ -31,12 +31,12 @@ import { getArgNumber } from '../lib/core/base';
 import { BaseScript } from '../lib/script/base-script';
 import { StandardReportLayout } from '../lib/report/layouts/standart.report.layout';
 import { BaseError } from '../lib/core/errors';
-import { percentDifference } from '../lib/utils/numbers';
+import { min, percentDifference } from '../lib/utils/numbers';
 
 // Extended symbol info type with volume data
 type MySymbolInfo = SymbolInfo & {
-  baseVolume: string | number;   // Base asset volume
-  quoteVolume: string | number;  // Quote asset volume (USDT)
+  baseVolume: string | number; // Base asset volume
+  quoteVolume: string | number; // Quote asset volume (USDT)
 };
 
 class Script extends BaseScript {
@@ -50,6 +50,10 @@ class Script extends BaseScript {
       mode: 'runtime',
       defaultValue: 30,
     },
+    {
+      key: 'preloadCandlesCount',
+      defaultValue: 180,
+    },
   ];
 
   // Script metadata
@@ -57,29 +61,32 @@ class Script extends BaseScript {
   description =
     'Scans all USDT swap symbols for strong daily moves (gainers/losers). Results are in the report table "Gainers And Losers".';
   version = 16;
-  
+
   // Strategy parameters
-  minPercent = getArgNumber('minPercent', 30);  // Minimum percentage move to consider
+  minPercent = getArgNumber('minPercent', 30); // Minimum percentage move to consider
 
   // Report and data components
   private reportLayout: StandardReportLayout;
-  private swapSymbols: MySymbolInfo[];  // List of all USDT swap symbols
-  lastId = 0;  // Current symbol index being analyzed
+  private swapSymbols: MySymbolInfo[]; // List of all USDT swap symbols
+  lastId = 0; // Current symbol index being analyzed
 
   // Analysis configuration
-  preloadCandlesCount = 180;        // Number of daily candles to analyze
-  timeframeNumber = 1440;           // 1 day in minutes
+  preloadCandlesCount = getArgNumber('preloadCandlesCount', 180); // Number of daily candles to analyze
+
+  timeframeNumber = 1440; // 1 day in minutes
   timeframeString: TimeFrame = '1d'; // Daily timeframe
 
   constructor(args: GlobalARGS) {
     super(args);
+    // Limit maximum candles to 700 to avoid excessive data load
+    this.preloadCandlesCount = min(700, this.preloadCandlesCount);
   }
 
   /**
    * Called on every price tick
    * Analyzes candles for gainers/losers
    */
-  async onTick(data: Tick): Promise<void> {
+  async onTick(): Promise<void> {
     await this.analyzeCandles();
   }
 
@@ -99,9 +106,14 @@ class Script extends BaseScript {
     // Fetch current ticker data for all symbols
     let symbolsData = (await sdkCall('fetchTickers', [])) || {};
 
-    log('GainersLosers::onInit', 'Ticker data loaded', { 
-      symbolsData: symbolsData[this.symbols[0]] 
-    }, true);
+    log(
+      'GainersLosers::onInit',
+      'Ticker data loaded',
+      {
+        symbolsData: symbolsData[this.symbols[0]],
+      },
+      true,
+    );
 
     // Initialize report layout
     this.reportLayout = new StandardReportLayout();
@@ -149,12 +161,12 @@ class Script extends BaseScript {
     // Calculate time range for historical data
     const startTimestamp = timeCurrent();
     const startTime = startTimestamp - this.preloadCandlesCount * this.timeframeNumber * 1000 * 60;
-    
+
     // Get current symbol to analyze
     const symbol = this.swapSymbols[this.lastId].symbol;
     const symbolInfo = this.swapSymbols[this.lastId];
     this.lastId++;
-    
+
     // Reset to beginning when all symbols are processed
     if (this.lastId >= this.swapSymbols.length) {
       this.waitUntil = timeCurrent() + 2 * 60 * 60 * 1000; // Wait 2 hours before next cycle
@@ -170,7 +182,7 @@ class Script extends BaseScript {
         const [timestamp, open, high, low, close] = history[i];
 
         // Calculate percentage moves within the day
-        const gain = percentDifference(low, high);    // Maximum gain from low to high
+        const gain = percentDifference(low, high); // Maximum gain from low to high
         const lose = percentDifference(high, low, true); // Maximum loss from high to low
 
         // Check if move exceeds minimum threshold

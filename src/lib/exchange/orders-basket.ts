@@ -10,7 +10,7 @@ import {
 } from './types';
 import { BaseError } from '../core/errors';
 import { TriggerService } from '../events';
-import { debug, error, log, logOnce, trace, warning } from '../core/log';
+import { debug, error, errorOnce, log, logOnce, trace, warning } from '../core/log';
 import { getArgBoolean, getArgNumber, getArgString, uniqueId } from '../core/base';
 import { globals } from '../core/globals';
 import { currentTime, timeToString } from '../utils/date-time';
@@ -85,6 +85,7 @@ export class OrdersBasket extends BaseObject {
     this.symbolInfo = await this.getSymbolInfo();
     logOnce('OrdersBasket::getSymbolInfo ' + this.symbol, 'symbolInfo', this.symbolInfo);
     this.isInit = true;
+    this.maxLeverage = getArgNumber('defaultLeverage', 10);
 
     if (!isTester()) {
       if (!this.symbolInfo) {
@@ -99,10 +100,10 @@ export class OrdersBasket extends BaseObject {
       if (this._connectionName.includes('binance')) {
         this.symbolInfo['limits']['cost']['min'] = 5;
       }
-      this.maxLeverage = getArgNumber('defaultLeverage', 100);
     }
 
     this.contractSize = this.symbolInfo.contractSize ?? 1;
+    this.maxLeverage = this.symbolInfo['limits']['leverage']['max'] ?? this.maxLeverage;
     this.updateLimits();
 
     if (this.leverage > this.maxLeverage) {
@@ -303,7 +304,16 @@ export class OrdersBasket extends BaseObject {
   async beforeOnPnlChange(order: Order): Promise<any> {
     try {
       if (order.status === 'closed') {
-        let pnl = await this._updatePosSlot(order);
+        let pnl = 0;
+        try {
+          pnl = await this._updatePosSlot(order);
+        } catch (e) {
+          errorOnce(e, {});
+          this.posSlot['long'] = await this.getPositionBySide('long', true);
+          this.posSlot['short'] = await this.getPositionBySide('short');
+          return;
+        }
+
         if (pnl !== 0) {
           await this.onPnlChange(pnl, 'pnl');
           await globals.events.emit('onPnlChange', { type: 'pnl', amount: pnl, symbol: this.symbol, order });
@@ -476,6 +486,7 @@ export class OrdersBasket extends BaseObject {
 
     try {
       order = await createOrder(this.symbol, type, side, amount, price, orderParams);
+
       // After creating the order, we force an update of the positions to ensure accuracy.
       // Because positions may not be updated by websocket
       this.isGetPositionsForced = true;

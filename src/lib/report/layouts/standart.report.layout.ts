@@ -25,6 +25,7 @@ export class StandardReportLayout extends BaseObject {
 
     if (globals.isDebug) {
       this.debugLayout = new DebugReportLayout();
+      this.debugLayout.init();
     }
   }
   async init() {}

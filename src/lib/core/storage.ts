@@ -82,14 +82,9 @@ export class Storage extends BaseObject {
 
     this.applyState(state, obj);
 
-    log(
-      'Storage::restoreState',
-      obj.constructor.name + ' is restored from key = ' + key,
-      {
-        restoredPropsLevel1: this.restoredPropsLevel1,
-      },
-      true,
-    );
+    log('Storage::restoreState', obj.constructor.name + ' is restored from key = ' + key, {
+      restoredPropsLevel1: this.restoredPropsLevel1,
+    });
   }
 
   private getState(obj: object, i = 0, props = []): StateInfo {
