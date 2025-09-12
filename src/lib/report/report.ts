@@ -42,7 +42,7 @@ export class Report extends BaseObject {
   private texts: Record<string, ReportText> = {};
   private charts: Record<string, ReportChart> = {};
   private actionButtons: Record<string, ReportActionButton> = {};
-
+  _nativeBlocks: any[] = [];
   private _layoutIndexes: Record<string, LayoutInfo> = {};
   private _layoutIterator = 0;
   private _layoutIAllowedTypes = ['table', 'chart', 'text', 'tvChart', 'card', 'actionButton'];
@@ -56,7 +56,7 @@ export class Report extends BaseObject {
 
   lastTimeUpdate = 0;
   fullReportChart = new ReportChart('fullReportChart', { chartType: ChartType.Line, aggPeriod: 24 * 60 * 60 * 1000 }); // 4 hours
-  constructor(args) {
+  constructor(args = {}) {
     super(args);
   }
 

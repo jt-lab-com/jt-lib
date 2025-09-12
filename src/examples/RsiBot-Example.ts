@@ -24,7 +24,7 @@ Parameters:
 - slPercent: Stop loss percentage (default 10%)
 */
 
-class Strategy extends BaseScript {
+class Script extends BaseScript {
   // Define script parameters with default values
   static definedArgs = [
     {
@@ -38,9 +38,9 @@ class Strategy extends BaseScript {
   ];
 
   // Strategy configuration
-  hedgeMode = true;  // Enable hedge mode for futures trading
-  sizeUsd: number;   // Position size in USD
-  
+  hedgeMode = true; // Enable hedge mode for futures trading
+  sizeUsd: number; // Position size in USD
+
   // Script metadata
   name = 'RSI Bot Example';
   description = 'RSI Bot Example. Buys when RSI < 30 and sells when RSI > 70';
@@ -70,28 +70,28 @@ class Strategy extends BaseScript {
 
 /**
  * RsiBasket - Implements RSI-based trading strategy
- * 
+ *
  * RSI Strategy Logic:
  * - RSI < 30: Oversold condition -> Buy signal (signal = 1)
  * - RSI > 70: Overbought condition -> Sell signal (signal = -1)
  * - 30 <= RSI <= 70: No signal (signal = 0)
  */
-export class RsiBasket extends OrdersBasket {
+class RsiBasket extends OrdersBasket {
   // RSI indicator instance
   private rsi14: RelativeStrengthIndex;
-  
+
   // Strategy parameters
-  sizeUsd: number = getArgNumber('sizeUsd', 100);           // Position size in USD
-  tpPercent: number = getArgNumber('tpPercent', 5) / 100;   // Take profit percentage (5%)
-  slPercent: number = getArgNumber('slPercent', 10) / 100;  // Stop loss percentage (10%)
-  
+  sizeUsd: number = getArgNumber('sizeUsd', 100); // Position size in USD
+  tpPercent: number = getArgNumber('tpPercent', 5) / 100; // Take profit percentage (5%)
+  slPercent: number = getArgNumber('slPercent', 10) / 100; // Stop loss percentage (10%)
+
   // Position tracking
-  isPositionOpened = false;  // Prevents multiple positions
+  isPositionOpened = false; // Prevents multiple positions
 
   async init() {
     // Initialize parent OrdersBasket
     await super.init();
-    
+
     // Create RSI indicator with 11-period on 1-hour timeframe
     this.rsi14 = await globals.indicators.rsi(this.symbol, '1h', 11);
 
@@ -105,16 +105,16 @@ export class RsiBasket extends OrdersBasket {
   async onTick() {
     // Skip if position is already open
     if (this.isPositionOpened) return;
-    
+
     // Get trading signal from RSI
     const signal = this.signal();
-    if (signal === 0) return;  // No signal
+    if (signal === 0) return; // No signal
 
     if (signal === 1) {
       // Buy signal: RSI < 30 (oversold)
       const amount = this.getContractsAmount(this.sizeUsd);
-      const takeProfit = this.close() * (1 + this.tpPercent);  // TP above entry
-      const stopLoss = this.close() * (1 - this.slPercent);    // SL below entry
+      const takeProfit = this.close() * (1 + this.tpPercent); // TP above entry
+      const stopLoss = this.close() * (1 - this.slPercent); // SL below entry
 
       await this.buyMarket(amount, takeProfit, stopLoss);
       this.isPositionOpened = true;
@@ -123,8 +123,8 @@ export class RsiBasket extends OrdersBasket {
     if (signal === -1) {
       // Sell signal: RSI > 70 (overbought)
       const amount = this.getContractsAmount(this.sizeUsd);
-      const takeProfit = this.close() * (1 - this.tpPercent);  // TP below entry
-      const stopLoss = this.close() * (1 + this.slPercent);    // SL above entry
+      const takeProfit = this.close() * (1 - this.tpPercent); // TP below entry
+      const stopLoss = this.close() * (1 + this.slPercent); // SL above entry
 
       await this.sellMarket(amount, takeProfit, stopLoss);
       this.isPositionOpened = true;
@@ -148,10 +148,10 @@ export class RsiBasket extends OrdersBasket {
    */
   signal() {
     const rsi = this.rsi14.getValue();
-    
-    if (rsi < 30) return -1;  // Oversold -> Buy signal
-    if (rsi > 70) return 1;   // Overbought -> Sell signal
 
-    return 0;  // No signal
+    if (rsi < 30) return -1; // Oversold -> Buy signal
+    if (rsi > 70) return 1; // Overbought -> Sell signal
+
+    return 0; // No signal
   }
 }

@@ -1,6 +1,5 @@
 import type { EventEmitter, TriggerService } from '../events';
 import type { Report } from '../report';
-import type { Script } from '../script';
 import type { Storage } from './storage';
 import type { BaseObject } from './base-object';
 import type { CandlesBufferService } from '../candles';
@@ -24,6 +23,7 @@ class GlobalScope {
 
   public IS_NO_LOGS = 0;
   logOnce: Map<string, any> = new Map();
+  loggedMessages: Map<string, number>;
   logOnceObj = {};
   params = {};
   logs = {};

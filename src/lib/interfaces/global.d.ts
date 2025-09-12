@@ -232,6 +232,7 @@ declare global {
   /**
    * getPositions - return array of positions for current script
    * @returns {Promise<Position[]>}
+   * options - forceFetch: boolean - if true, fetch positions from exchange, otherwise return cached positions
    * @example:
    * let positions = await getPositions();
    * for (let position of positions) {

@@ -24,7 +24,11 @@ export abstract class Trigger extends BaseObject {
     this._args = args;
   }
 
+  isInit = false;
   init() {
+    if (this.isInit) return;
+
+    this.isInit = true;
     const storageKey = this._args?.storageKey;
     if (storageKey && !isTester()) {
       try {
@@ -33,7 +37,7 @@ export abstract class Trigger extends BaseObject {
         const className = this.constructor.name;
         const key = className + storageKey + symbol;
         globals.storage.addObject(key, this, ['storageTasks']);
-        log('Trigger::init', `Object added to storage with key ${key}`, { args: this._args });
+        //log('Trigger::init', `Object added to storage with key ${key}`, { args: this._args });
       } catch (e) {
         error(e, { args: this._args });
       }
@@ -50,7 +54,7 @@ export abstract class Trigger extends BaseObject {
 
   afterReStore() {
     const className = this.constructor.name;
-    log('Trigger::afterReStore', 'restoring tasks from storage', { storageTasks: this.storageTasks, className }, true);
+    log('Trigger::afterReStore', 'restoring tasks from storage', { storageTasks: this.storageTasks, className });
     if (this.storageTasks?.length) {
       for (const task of this.storageTasks) {
         this.addTask(task);

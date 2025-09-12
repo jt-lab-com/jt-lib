@@ -86,7 +86,7 @@ export class BaseScript extends BaseObject {
 
   //async onBeforeTick() {}
 
-  async onTick(data: Tick) {}
+  async onTick() {}
 
   // async onAfterTick() {}
 
@@ -150,7 +150,7 @@ export class BaseScript extends BaseObject {
       //TODO delete all   await globals.events.emit('onBeforeTick');    await globals.events.emit('onAfterTick');
       // await this.onBeforeTick();
       //  await globals.events.emit('onBeforeTick');
-      await this.onTick(data);
+      await this.onTick();
       // await globals.events.emit('onTick');
       await globals.events.emitOnTick();
       //  await this.onAfterTick();

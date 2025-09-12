@@ -32,6 +32,10 @@ export class TriggerService extends BaseObject implements TriggerServiceInterfac
   }
 
   private createNewPriceTrigger(symbol: string, storageKey: string = undefined) {
+    if (this._priceTriggers[symbol]) {
+      return this._priceTriggers[symbol];
+    }
+
     let trigger = new PriceTrigger({ symbol, storageKey });
     trigger.init();
     this.addChild(trigger);
