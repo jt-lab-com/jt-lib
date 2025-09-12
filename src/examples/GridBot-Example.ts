@@ -98,7 +98,7 @@ class Script extends BaseScript {
 
 /**
  * GridBasket - Handles grid trading for one symbol
- * 
+ *
  * SIMPLE WORKFLOW:
  * 1. Buy at market price
  * 2. Place limit buy order 5% below current price
@@ -107,7 +107,7 @@ class Script extends BaseScript {
  * 5. If price rises 2%: sell everything for profit
  * 6. Start over
  */
-export class GridBasket extends OrdersBasket {
+class GridBasket extends OrdersBasket {
   // Strategy parameters
   sizeUsd: number = getArgNumber('sizeUsd', 100); // Initial position size in USD
   gridStepPercent = getArgNumber('gridStepPercent', 10); // Grid step size in percentage
