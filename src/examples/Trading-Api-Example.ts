@@ -248,8 +248,8 @@ class Script extends BaseScript {
 
   private createOrderCallback = async () => {
     try {
-      const amount = this.orderBasket.getContractsAmount(this.sizeUsd);
       const limitPrice = this.orderBasket.close() * 0.7;
+      const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
       const result = await this.orderBasket.createOrder('limit', 'buy', amount, limitPrice, {});
       globals.report.tableUpdate('API Call Results', { method: 'createOrder', result });
       await globals.report.updateReport();
@@ -260,8 +260,8 @@ class Script extends BaseScript {
 
   private buyLimitCallback = async () => {
     try {
-      const amount = this.orderBasket.getContractsAmount(this.sizeUsd);
       const limitPrice = this.orderBasket.close() * 0.7;
+      const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
       const result = await this.orderBasket.buyLimit(amount, limitPrice);
       globals.report.tableUpdate('API Call Results', { method: 'buyLimit', result });
       await globals.report.updateReport();
@@ -272,8 +272,8 @@ class Script extends BaseScript {
 
   private modifyOrderCallback = async () => {
     try {
-      let amount = this.orderBasket.getContractsAmount(this.sizeUsd);
-      let limitPrice = this.orderBasket.close() * 0.7;
+      const limitPrice = this.orderBasket.close() * 0.7;
+      const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
 
       await sleep(1000); // wait for the order to be created
 
@@ -288,8 +288,8 @@ class Script extends BaseScript {
 
   private cancelOrderCallback = async () => {
     try {
-      const amount = this.orderBasket.getContractsAmount(this.sizeUsd);
       const limitPrice = this.orderBasket.close() * 0.7;
+      const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
       const order = await this.orderBasket.buyLimit(amount, limitPrice);
 
       const result = await this.orderBasket.cancelOrder(order.id);
@@ -317,20 +317,6 @@ class Script extends BaseScript {
       await globals.report.updateReport();
     } catch (e) {
       await this.handleError('getClosedOrders', e);
-    }
-  };
-
-  private buySlTpCallback = async () => {
-    try {
-      let amount = this.orderBasket.getContractsAmount(this.sizeUsd);
-      const percent = 0.05; // 5%
-      const sl = this.orderBasket.price() * (1 - percent);
-      const tp = this.orderBasket.price() * (1 + percent);
-      const result = await this.orderBasket.buyMarket(amount, tp, sl);
-      globals.report.tableUpdate('API Call Results', { method: 'BuySlTp', result });
-      await globals.report.updateReport();
-    } catch (e) {
-      await this.handleError('BuySlTp', e);
     }
   };
 
