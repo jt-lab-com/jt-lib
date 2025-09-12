@@ -35,10 +35,10 @@ export class OrdersBasket extends BaseObject {
   protected leverage: number = 1;
   protected prefix: string;
   protected maxLeverage: number;
-  protected contractSize: number;
-  protected _minContractQuoted: number;
-  protected _minContractBase: number;
-  protected minContractStep: number;
+  contractSize: number;
+  _minContractQuoted: number;
+  _minContractBase: number;
+  _minContractStep: number;
 
   private nextOrderId = 0;
 
@@ -147,7 +147,7 @@ export class OrdersBasket extends BaseObject {
       contractSize: this.contractSize,
       _minContractQuoted: this._minContractQuoted,
       _minContractBase: this._minContractBase,
-      minContractStep: this.minContractStep,
+      minContractStep: this._minContractStep,
       loadedOpenOrders: openOrders.length,
     });
   }
@@ -156,7 +156,7 @@ export class OrdersBasket extends BaseObject {
   }
 
   updateLimits() {
-    this.minContractStep = this.symbolInfo.limits.amount.min;
+    this._minContractStep = this.symbolInfo.limits.amount.min;
 
     if (!this.symbolInfo?.limits?.amount?.min) {
       throw new BaseError('OrdersBasket::init min amount is not defined for symbol ' + this.symbol, {
