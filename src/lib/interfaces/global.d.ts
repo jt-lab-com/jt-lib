@@ -40,6 +40,8 @@ declare global {
   export type ChartDataReportBlock = ReportTypes.ChartDataReportBlock;
   export type TextReportBlock = ReportTypes.TextReportBlock;
   export type OptimizerResultsReportBlock = ReportTypes.OptimizerResultsReportBlock;
+  export type TVChartReportBlock = ReportTypes.TVChartReportBlock;
+  export type TVChartPlayerReportBlock = ReportTypes.TVChartPlayerReportBlock;
 
   export type Position = PositionTypes.Position;
   export type PositionSide = PositionTypes.PositionSide;
