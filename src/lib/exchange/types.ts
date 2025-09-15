@@ -5,6 +5,7 @@ export interface ExchangeParams {
   prefix?: string;
   leverage?: number;
   triggerType?: TriggerType;
+  onTickInterval?: number; // in ms
 }
 
 export type TriggerType = 'exchange' | 'script';
@@ -49,12 +50,9 @@ export interface ExchangeOrder {
 
 export type MarketInfoShort = {
   symbol: string;
-  close: number;
-  buyContracts: number;
-  buySizeUsd: number;
-  BuyEntryPrice: number;
-  sellContracts: number;
-  sellSizeUsd: number;
-  sellEntryPrice: number;
-  leverage: number;
+  price: number;
+  ob: { ask: any; bid: any; spread: number };
+  pos: any[];
+  timeInfo: { t: any; st: any };
+  positions: any[];
 };
