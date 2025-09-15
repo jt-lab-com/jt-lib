@@ -1,7 +1,7 @@
 import { globals } from '../core/globals';
 import { error, log, warning } from '../core/log';
 import { EventEmitter, TriggerService } from '../events';
-import { Report } from '../report';
+import { MainReport } from '../report';
 import { BaseObject } from '../core/base-object';
 import { Storage } from '../core/storage';
 import { getArgBoolean, getArgString } from '../core/base';
@@ -70,7 +70,7 @@ export class BaseScript extends BaseObject {
 
     globals.events = new EventEmitter({ idPrefix });
     globals.triggers = new TriggerService({ idPrefix });
-    globals.report = new Report({ idPrefix });
+    globals.report = new MainReport({ idPrefix });
     globals.storage = new Storage({ idPrefix });
     globals.candlesBufferService = new CandlesBufferService({ idPrefix });
     globals.indicators = new Indicators({ idPrefix });

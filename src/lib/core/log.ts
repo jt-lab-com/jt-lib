@@ -51,7 +51,7 @@ export function error(...args: any): void {
     }
 
     if (args[1]) {
-      let context = args[1];
+      const context = args[1];
       let line = new Error().stack.split('\n')[2];
 
       error.addContext(line, context);

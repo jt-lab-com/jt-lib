@@ -1,18 +1,18 @@
 namespace ReportTypes {
-  interface GenericReportBlock<T extends ReportBlockType, D extends ReportBlockData> {
+  export interface GenericReportBlock<T extends ReportBlockType, D extends ReportBlockData> {
     type: T;
     name?: string;
     isVisible: boolean;
     data: D;
   }
 
-  interface ReportBlock {
+  export interface ReportBlock {
     type: ReportBlockType;
     name?: string;
     data: ReportBlockData;
   }
 
-  type ReportBlockType =
+  export type ReportBlockType =
     | 'trading_view_chart'
     | 'table'
     | 'chart'
@@ -22,7 +22,7 @@ namespace ReportTypes {
     | 'text'
     | 'chart_playback';
 
-  type ReportBlockData =
+  export type ReportBlockData =
     | TableRow[]
     | CardData
     | ChartData
@@ -32,9 +32,9 @@ namespace ReportTypes {
     | TVChartData
     | PlaybackChartSymbolData;
 
-  type TableRow = Record<string, any>;
+  export type TableRow = Record<string, any>;
 
-  interface CardData {
+  export interface CardData {
     title: string;
     value: string | number;
     variant: CardVariant;
@@ -43,7 +43,7 @@ namespace ReportTypes {
 
   export type CardVariant = 'text' | 'number' | 'percent';
 
-  interface CardOptions {
+  export interface CardOptions {
     format?: CardNumberFormat;
     currency?: string;
     icon?: string;
@@ -52,29 +52,29 @@ namespace ReportTypes {
 
   export type CardNumberFormat = 'default' | 'currency' | 'date';
 
-  interface ChartData {
+  export interface ChartData {
     series: Series[];
     time: string[];
   }
 
-  interface Series {
+  export interface Series {
     name: string;
     data: number[];
   }
 
-  interface ActionButtonData {
+  export interface ActionButtonData {
     title: string;
     paramName: string;
     value: string | number;
   }
 
-  interface TextData {
+  export interface TextData {
     value: string;
     variant: string;
     align: string;
   }
 
-  interface TVChartData {
+  export interface TVChartData {
     symbol: string;
     startTime: number;
     endTime: number;
@@ -88,12 +88,12 @@ namespace ReportTypes {
     width?: number;
   }
 
-  interface PlaybackChartVisibleRange {
+  export interface PlaybackChartVisibleRange {
     from: number;
     to: number;
   }
 
-  interface PlaybackChartShape {
+  export interface PlaybackChartShape {
     id?: string;
     shape?: 'circle' | 'square' | 'arrowUp' | 'arrowDown';
     text?: string;
@@ -102,12 +102,12 @@ namespace ReportTypes {
     options?: PlaybackChartShapeOptions;
   }
 
-  interface PlaybackChartShapeOptions {
+  export interface PlaybackChartShapeOptions {
     color?: string;
     size?: number;
   }
 
-  interface PlaybackChartPriceLine {
+  export interface PlaybackChartPriceLine {
     id?: string;
     renderTime: number;
     price: number;
@@ -115,14 +115,14 @@ namespace ReportTypes {
     options?: PlaybackChartPriceLineOptions;
   }
 
-  interface PlaybackChartPriceLineOptions {
+  export interface PlaybackChartPriceLineOptions {
     color?: string;
     lineWidth?: TVChartSeriesLineWidth;
     lineStyle?: TVChartSeriesLineStyle;
     axisLabelVisible?: boolean;
   }
 
-  interface LineSeries {
+  export interface LineSeries {
     name?: string;
     color?: string;
     lineWidth?: TVChartSeriesLineWidth;
@@ -145,7 +145,7 @@ namespace ReportTypes {
     Curved = 2,
   }
 
-  interface PlaybackChartSymbolData {
+  export interface PlaybackChartSymbolData {
     startTime: number;
     endTime: number;
     symbol: string;
@@ -156,29 +156,29 @@ namespace ReportTypes {
     cards?: PlaybackChartCard[];
   }
 
-  type PlaybackChartCard<T extends CardType = CardType> = T extends CardType.Text
+  export type PlaybackChartCard<T extends CardType = CardType> = T extends CardType.Text
     ? PlaybackChartTextCard
     : T extends CardType.Formula
-      ? PaybackChartFormulaCard
-      : T extends CardType.Date
-        ? PlaybackChartDateCard
-        : T extends CardType.Currency
-          ? PlaybackChartCurrencyCard
-          : never;
+    ? PaybackChartFormulaCard
+    : T extends CardType.Date
+    ? PlaybackChartDateCard
+    : T extends CardType.Currency
+    ? PlaybackChartCurrencyCard
+    : never;
 
-  interface PlaybackChartBaseCard {
+  export interface PlaybackChartBaseCard {
     id?: string;
     title: string;
     renderTime: number;
   }
 
-  interface PlaybackChartTextCard extends PlaybackChartBaseCard {
+  export interface PlaybackChartTextCard extends PlaybackChartBaseCard {
     type: CardType.Text;
     value: string;
     // options?: unknown;
   }
 
-  interface PaybackChartFormulaCard extends PlaybackChartBaseCard {
+  export interface PaybackChartFormulaCard extends PlaybackChartBaseCard {
     type: CardType.Formula;
     value: string;
     options?: FormulaOptions;
@@ -190,7 +190,7 @@ namespace ReportTypes {
     suffix?: string;
   }
 
-  interface PlaybackChartDateCard extends PlaybackChartBaseCard {
+  export interface PlaybackChartDateCard extends PlaybackChartBaseCard {
     type: CardType.Date;
     value: number | string;
     options?: DateOptions;
@@ -200,7 +200,7 @@ namespace ReportTypes {
     format?: string;
   }
 
-  interface PlaybackChartCurrencyCard extends PlaybackChartBaseCard {
+  export interface PlaybackChartCurrencyCard extends PlaybackChartBaseCard {
     type: CardType.Currency;
     value: number;
     options?: CurrencyOptions;

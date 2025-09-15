@@ -1,5 +1,5 @@
 import type { EventEmitter, TriggerService } from '../events';
-import type { Report } from '../report';
+import type { MainReport } from '../report';
 import type { Storage } from './storage';
 import type { BaseObject } from './base-object';
 import type { CandlesBufferService } from '../candles';
@@ -10,7 +10,7 @@ import { BaseScript } from '../script/base-script';
 class GlobalScope {
   private _script: BaseScript = null;
   private _triggers: TriggerService = null;
-  private _report: Report = null;
+  private _report: MainReport = null;
   private _events: EventEmitter = null;
   private _storage: Storage = null;
   private _candlesBufferService: CandlesBufferService = null;
@@ -140,7 +140,7 @@ class GlobalScope {
     this._report = report;
   }
 
-  get report(): Report {
+  get report(): MainReport {
     return this._report;
   }
 
