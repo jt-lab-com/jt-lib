@@ -133,9 +133,9 @@ export function logOnce(event, msg, args = {}, ttl = 0) {
   globals.logOnce.set(event, { date: currentTimeString(), event, msg, args });
 }
 
+export function errorOnce(event: string, msg: string, context: object, ttl: number): boolean;
 export function errorOnce(e: Error | BaseError, context: object, ttl: number): boolean;
 export function errorOnce(e: Error | BaseError, context: object): boolean;
-export function errorOnce(event: string, msg: string, context: object, ttl: number): boolean;
 export function errorOnce(...args: any): boolean {
   if (globals.IS_NO_LOGS) return;
 
@@ -156,6 +156,11 @@ export function errorOnce(...args: any): boolean {
     msg = args[1];
     context = args[2] || {};
     ttl = args[3] || ttl;
+  } else {
+    context = { args };
+    event = 'errorOnce';
+    msg = 'Something wrong with arguments in errorOnce() function ';
+    ttl = args[2] || ttl;
   }
 
   if (!isMessageLogged(event, msg, ttl)) {
