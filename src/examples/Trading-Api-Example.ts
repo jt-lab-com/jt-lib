@@ -5,6 +5,7 @@ import { getArgNumber } from '../lib/core/base';
 import { OrdersBasket } from '../lib/exchange';
 import { BaseScript } from '../lib/script/base-script';
 import { sleep } from '../lib/utils/misc';
+import { StandardReportLayout } from '../lib/report/layouts';
 
 /*
 Trading API Callback Example
@@ -48,6 +49,7 @@ class Script extends BaseScript {
   sizeUsd: any;
   symbol: string;
   orderBasket: OrdersBasket;
+  private reportLayout: StandardReportLayout;
 
   constructor(params: GlobalARGS) {
     super(params);
@@ -76,8 +78,8 @@ class Script extends BaseScript {
       },
     );
 
+    this.reportLayout = new StandardReportLayout();
     await this.createButtonsWithCallbacks();
-    await globals.report.updateReport();
   };
 
   async onOrderChange(order: Order): Promise<void> {
@@ -246,8 +248,8 @@ class Script extends BaseScript {
 
   private createOrderCallback = async () => {
     try {
-      const amount = this.orderBasket.getContractsAmount(this.sizeUsd);
       const limitPrice = this.orderBasket.close() * 0.7;
+      const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
       const result = await this.orderBasket.createOrder('limit', 'buy', amount, limitPrice, {});
       globals.report.tableUpdate('API Call Results', { method: 'createOrder', result });
       await globals.report.updateReport();
@@ -258,8 +260,8 @@ class Script extends BaseScript {
 
   private buyLimitCallback = async () => {
     try {
-      const amount = this.orderBasket.getContractsAmount(this.sizeUsd);
       const limitPrice = this.orderBasket.close() * 0.7;
+      const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
       const result = await this.orderBasket.buyLimit(amount, limitPrice);
       globals.report.tableUpdate('API Call Results', { method: 'buyLimit', result });
       await globals.report.updateReport();
@@ -270,8 +272,8 @@ class Script extends BaseScript {
 
   private modifyOrderCallback = async () => {
     try {
-      let amount = this.orderBasket.getContractsAmount(this.sizeUsd);
-      let limitPrice = this.orderBasket.close() * 0.7;
+      const limitPrice = this.orderBasket.close() * 0.7;
+      const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
 
       await sleep(1000); // wait for the order to be created
 
@@ -286,8 +288,8 @@ class Script extends BaseScript {
 
   private cancelOrderCallback = async () => {
     try {
-      const amount = this.orderBasket.getContractsAmount(this.sizeUsd);
       const limitPrice = this.orderBasket.close() * 0.7;
+      const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
       const order = await this.orderBasket.buyLimit(amount, limitPrice);
 
       const result = await this.orderBasket.cancelOrder(order.id);
@@ -318,20 +320,6 @@ class Script extends BaseScript {
     }
   };
 
-  private buySlTpCallback = async () => {
-    try {
-      let amount = this.orderBasket.getContractsAmount(this.sizeUsd);
-      const percent = 0.05; // 5%
-      const sl = this.orderBasket.price() * (1 - percent);
-      const tp = this.orderBasket.price() * (1 + percent);
-      const result = await this.orderBasket.buyMarket(amount, tp, sl);
-      globals.report.tableUpdate('API Call Results', { method: 'BuySlTp', result });
-      await globals.report.updateReport();
-    } catch (e) {
-      await this.handleError('BuySlTp', e);
-    }
-  };
-
   // Helper method for error handling
   private handleError = async (method: string, e: any) => {
     const result = 'Error: ' + e.message;
@@ -347,18 +335,10 @@ class Script extends BaseScript {
     await globals.report.updateReport();
   }
 
-  async onTick(data) {
+  async onTick() {
     globals.report.cardSetValue('Price', this.orderBasket.price());
     globals.report.cardSetValue('Bid', this.orderBasket.bid());
     globals.report.cardSetValue('Ask', this.orderBasket.ask());
     globals.report.cardSetValue('Time', timeToStrHms(tms()));
-
-    if (this.iterator % 5 === 0) {
-      await globals.report.updateReport();
-    }
   }
-
-  onStop = async () => {
-    await globals.report.updateReport();
-  };
 }

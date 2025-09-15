@@ -1,5 +1,5 @@
 import { globals } from './globals';
-import { currentTime, currentTimeString } from '../utils/date-time';
+import { currentTime, currentTimeString, timeCurrent } from '../utils/date-time';
 import { getArgBoolean } from './base';
 import { BaseError } from './errors';
 
@@ -110,15 +110,18 @@ export function getLogs(type: string): Record<string, any>[] {
 }
 
 function isMessageLogged(event: string, msg: string, ttl = 0) {
-  if (globals.logOnce === undefined) globals.logOnce = new Map();
+  if (globals.loggedMessages === undefined) globals.loggedMessages = new Map();
   const key = event + msg;
   ttl = ttl ? ttl : 86400000 * 365 * 10; // 10 years
+  if (ttl < timeCurrent()) {
+    ttl = timeCurrent() + ttl;
+  }
 
-  if (globals.logOnce.has(key) === false) {
-    globals.logOnce.set(key, ttl);
+  if (globals.loggedMessages.has(key) === false) {
+    globals.loggedMessages.set(key, ttl);
     return false;
-  } else if (globals.logOnce.get(key) < tms()) {
-    globals.logOnce.set(key, ttl);
+  } else if (globals.loggedMessages.get(key) < timeCurrent()) {
+    globals.loggedMessages.set(key, ttl);
     return false;
   }
 
@@ -130,20 +133,63 @@ export function logOnce(event, msg, args = {}, ttl = 0) {
   globals.logOnce.set(event, { date: currentTimeString(), event, msg, args });
 }
 
-export function errorOnce(event, msg, args = {}, ttl = 0) {
+export function errorOnce(event: string, msg: string, context: object, ttl: number): boolean;
+export function errorOnce(e: Error | BaseError, context: object, ttl: number): boolean;
+export function errorOnce(e: Error | BaseError, context: object): boolean;
+export function errorOnce(...args: any): boolean {
   if (globals.IS_NO_LOGS) return;
+
+  let event: string,
+    msg: string,
+    context: any = {},
+    ttl = 60 * 60 * 1000, //1 hour default
+    e: Error | BaseError = null;
+
+  if (args[0] && args[0] instanceof Error) {
+    e = args[0];
+    event = 'error';
+    context = args[1] || {};
+    ttl = args[2] || ttl;
+    msg = e.message;
+  } else if (args[0] && typeof args[0] === 'string') {
+    event = args[0];
+    msg = args[1];
+    context = args[2] || {};
+    ttl = args[3] || ttl;
+  } else {
+    context = { args };
+    event = 'errorOnce';
+    msg = 'Something wrong with arguments in errorOnce() function ';
+    ttl = args[2] || ttl;
+  }
+
   if (!isMessageLogged(event, msg, ttl)) {
-    error(event, msg, args);
+    //logOnce(event, msg, args, ttl);
+    if (e) {
+      error(e, context);
+    } else {
+      error(event, msg, context);
+    }
     return true;
   }
   return false;
 }
 
-export function warningOnce(event, msg, args = {}, ttl = 0) {
-  if (globals.IS_NO_LOGS) return;
+export function warningOnce(
+  event: string,
+  msg: string,
+  context: any = {},
+  ttl = 60 * 60 * 1000, // 1 hour default
+): boolean {
+  if (globals.IS_NO_LOGS) return false;
+
   if (!isMessageLogged(event, msg, ttl)) {
-    warning(event, msg, args);
+    logOnce(event, msg, context, ttl);
+    warning(event, msg, context);
+    return true;
   }
+
+  return false;
 }
 
 function _updateLog(
