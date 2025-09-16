@@ -35,11 +35,49 @@ declare global {
   export type TimeFrame = '1m' | '5m' | '15m' | '1h' | '1d';
 
   export type ReportData = ReportTypes.ReportData;
+  export type ReportBlock = ReportTypes.ReportBlock;
+  export type ReportBlockType = ReportTypes.ReportBlockType;
+  export type ReportBlockData = ReportTypes.ReportBlockData;
+  export type GenericReportBlock = ReportTypes.GenericReportBlock;
+  export type TableRow = ReportTypes.TableRow;
+  export type CardData = ReportTypes.CardData;
+  export type CardOptions = ReportTypes.CardOptions;
+  export type ChartData = ReportTypes.ChartData;
+  export type Series = ReportTypes.Series;
+  export type ActionButtonData = ReportTypes.ActionButtonData;
+  export type TextData = ReportTypes.TextData;
+  export type TVChartData = ReportTypes.TVChartData;
+  export type PlaybackChartSymbolData = ReportTypes.PlaybackChartSymbolData;
+  export type PlaybackChartCard = ReportTypes.PlaybackChartCard;
+  export type PlaybackChartBaseCard = ReportTypes.PlaybackChartBaseCard;
+  export type PlaybackChartTextCard = ReportTypes.PlaybackChartTextCard;
+  export type PaybackChartFormulaCard = ReportTypes.PaybackChartFormulaCard;
+  export type PlaybackChartDateCard = ReportTypes.PlaybackChartDateCard;
+  export type PlaybackChartCurrencyCard = ReportTypes.PlaybackChartCurrencyCard;
   export type TableDataReportBlock = ReportTypes.TableDataReportBlock;
   export type CardDataReportBlock = ReportTypes.CardDataReportBlock;
   export type ChartDataReportBlock = ReportTypes.ChartDataReportBlock;
   export type TextReportBlock = ReportTypes.TextReportBlock;
   export type OptimizerResultsReportBlock = ReportTypes.OptimizerResultsReportBlock;
+  export type TVChartReportBlock = ReportTypes.TVChartReportBlock;
+
+  export type TVChartPlayerReportBlock = ReportTypes.TVChartPlayerReportBlock;
+
+  export type PlaybackChartVisibleRange = ReportTypes.PlaybackChartVisibleRange;
+  export type PlaybackChartShape = ReportTypes.PlaybackChartShape;
+  export type PlaybackChartShapeOptions = ReportTypes.PlaybackChartShapeOptions;
+  export type PlaybackChartPriceLine = ReportTypes.PlaybackChartPriceLine;
+  export type PlaybackChartPriceLineOptions = ReportTypes.PlaybackChartPriceLineOptions;
+  export type LineSeries = ReportTypes.LineSeries;
+  export type TVChartSeriesLineWidth = ReportTypes.TVChartSeriesLineWidth;
+  export type TVChartSeriesLineStyle = ReportTypes.TVChartSeriesLineStyle;
+  export type TVChartSeriesLineType = ReportTypes.TVChartSeriesLineType;
+  export type FormulaOptions = ReportTypes.FormulaOptions;
+  export type DateOptions = ReportTypes.DateOptions;
+  export type CurrencyOptions = ReportTypes.CurrencyOptions;
+  export type CardType = ReportTypes.CardType;
+  export type CardVariant = ReportTypes.CardVariant;
+  export type CardNumberFormat = ReportTypes.CardNumberFormat;
 
   export type Position = PositionTypes.Position;
   export type PositionSide = PositionTypes.PositionSide;
@@ -232,6 +270,7 @@ declare global {
   /**
    * getPositions - return array of positions for current script
    * @returns {Promise<Position[]>}
+   * options - forceFetch: boolean - if true, fetch positions from exchange, otherwise return cached positions
    * @example:
    * let positions = await getPositions();
    * for (let position of positions) {

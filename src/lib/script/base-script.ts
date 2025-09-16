@@ -1,7 +1,7 @@
 import { globals } from '../core/globals';
 import { error, log, warning } from '../core/log';
 import { EventEmitter, TriggerService } from '../events';
-import { Report } from '../report';
+import { MainReport } from '../report';
 import { BaseObject } from '../core/base-object';
 import { Storage } from '../core/storage';
 import { getArgBoolean, getArgString } from '../core/base';
@@ -70,7 +70,7 @@ export class BaseScript extends BaseObject {
 
     globals.events = new EventEmitter({ idPrefix });
     globals.triggers = new TriggerService({ idPrefix });
-    globals.report = new Report({ idPrefix });
+    globals.report = new MainReport({ idPrefix });
     globals.storage = new Storage({ idPrefix });
     globals.candlesBufferService = new CandlesBufferService({ idPrefix });
     globals.indicators = new Indicators({ idPrefix });
@@ -86,7 +86,7 @@ export class BaseScript extends BaseObject {
 
   //async onBeforeTick() {}
 
-  async onTick(data: Tick) {}
+  async onTick() {}
 
   // async onAfterTick() {}
 
@@ -150,7 +150,7 @@ export class BaseScript extends BaseObject {
       //TODO delete all   await globals.events.emit('onBeforeTick');    await globals.events.emit('onAfterTick');
       // await this.onBeforeTick();
       //  await globals.events.emit('onBeforeTick');
-      await this.onTick(data);
+      await this.onTick();
       // await globals.events.emit('onTick');
       await globals.events.emitOnTick();
       //  await this.onAfterTick();

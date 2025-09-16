@@ -10,6 +10,7 @@ import { BaseError } from '../core/errors';
 
 import { getArgBoolean, getArgNumber } from '../core/base';
 import { validateNumbersInObject } from '../utils/numbers';
+import { ReportTVChart } from './widgets/report-tv-chart';
 
 /**
  * Report - provide functionality for create report of trading strategy. Report can be viewed in web interface.
@@ -33,7 +34,7 @@ type LayoutInfo = {
   index: number;
 };
 
-export class Report extends BaseObject {
+export class MainReport extends BaseObject {
   private title: string;
   private description: string;
   private tables: Record<string, ReportTable> = {};
@@ -42,10 +43,13 @@ export class Report extends BaseObject {
   private texts: Record<string, ReportText> = {};
   private charts: Record<string, ReportChart> = {};
   private actionButtons: Record<string, ReportActionButton> = {};
+  tvChart: ReportTVChart;
 
+  _nativeBlocks: any[] = [];
   private _layoutIndexes: Record<string, LayoutInfo> = {};
   private _layoutIterator = 0;
   private _layoutIAllowedTypes = ['table', 'chart', 'text', 'tvChart', 'card', 'actionButton'];
+
   isSetLayoutIndexByDefault: boolean = true;
 
   symbol: string = ARGS.symbol;
@@ -56,8 +60,12 @@ export class Report extends BaseObject {
 
   lastTimeUpdate = 0;
   fullReportChart = new ReportChart('fullReportChart', { chartType: ChartType.Line, aggPeriod: 24 * 60 * 60 * 1000 }); // 4 hours
-  constructor(args) {
+  constructor(args = {}) {
     super(args);
+  }
+
+  createTvChart(symbol: string, interval: string = '60', startTime?: number, endTime?: number) {
+    this.tvChart = new ReportTVChart(symbol, interval, startTime, endTime);
   }
 
   setLayoutIndex(type: LayoutInfoObjType, name: string, index: number = undefined) {
@@ -562,6 +570,15 @@ export class Report extends BaseObject {
           } catch (e) {
             error(e);
           }
+        }
+      }
+
+      if (this.tvChart) {
+        try {
+          const tvChartInfo = await this.tvChart.prepareDataToReport();
+          this._reportData.blocks.push(tvChartInfo);
+        } catch (e) {
+          error(e);
         }
       }
 
