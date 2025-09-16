@@ -34,7 +34,7 @@ export class DebugReportLayout extends BaseObject {
   }
 
   async onOrderChange(order) {
-    globals.report.tableUpdate('👾 OnOrderChange', { ...order }, '_id');
+    globals.report.tableUpdate('👾 OnOrderChange', { ...order, _updated: new Date().toUTCString() }, '_id');
   }
   async onReportAction(data: any) {
     let { action, value } = data;
