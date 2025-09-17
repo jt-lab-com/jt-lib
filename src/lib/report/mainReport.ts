@@ -10,7 +10,7 @@ import { BaseError } from '../core/errors';
 
 import { getArgBoolean, getArgNumber } from '../core/base';
 import { validateNumbersInObject } from '../utils/numbers';
-import { ReportTVChart } from './widgets/report-tv-chart';
+import { ReportTvChart } from './widgets/report-tv-chart';
 
 /**
  * Report - provide functionality for create report of trading strategy. Report can be viewed in web interface.
@@ -43,7 +43,7 @@ export class MainReport extends BaseObject {
   private texts: Record<string, ReportText> = {};
   private charts: Record<string, ReportChart> = {};
   private actionButtons: Record<string, ReportActionButton> = {};
-  tvChart: ReportTVChart;
+  tvChart: ReportTvChart;
 
   _nativeBlocks: any[] = [];
   private _layoutIndexes: Record<string, LayoutInfo> = {};
@@ -65,7 +65,7 @@ export class MainReport extends BaseObject {
   }
 
   createTvChart(symbol: string, interval: string = '60', startTime?: number, endTime?: number) {
-    this.tvChart = new ReportTVChart(symbol, interval, startTime, endTime);
+    this.tvChart = new ReportTvChart(symbol, interval, startTime, endTime);
   }
 
   setLayoutIndex(type: LayoutInfoObjType, name: string, index: number = undefined) {
