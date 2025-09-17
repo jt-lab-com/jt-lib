@@ -122,7 +122,7 @@ export class OrdersBasket extends BaseObject {
         for (const order of openOrders) {
           const { clientOrderId } = order.clientOrderId;
 
-          this.ordersByClientId.set(clientOrderId, order);
+          this.ordersByClientId.set(clientOrderId, { ...order });
         }
       }
 
@@ -204,7 +204,7 @@ export class OrdersBasket extends BaseObject {
     //TODO write test for position update in websocket
     // await this.getPositions(true);
 
-    this.ordersByClientId.set(clientOrderId, order);
+    this.ordersByClientId.set(clientOrderId, { ...order });
     return await this.onOrderChange(order);
   }
 
@@ -226,6 +226,8 @@ export class OrdersBasket extends BaseObject {
     } else {
       warning('OrdersBasket::_cancelSecondSlTp', 'Opposite order not found', { oppositeId });
     }
+
+    log('OrdersBasket::_cancelSecondSlTp', orderId, { orderId, oppositeId, idToCancel });
   }
 
   async onOrderChange(order: Order): Promise<any> {
@@ -265,6 +267,7 @@ export class OrdersBasket extends BaseObject {
     }
 
     if (amountChange <= 0) {
+      this.posSlot[posSide] = await this.getPositionBySide(posSide as 'long' | 'short');
       throw new BaseError('OrdersBasket::_updatePosSlot amountChange <= 0', {
         posSide,
         isReduce,
