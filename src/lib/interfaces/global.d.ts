@@ -443,6 +443,8 @@ declare global {
   const axios: any;
 
   const getUserId: () => string;
+
+  const assert: typeof import('assert');
 }
 
 export {};
