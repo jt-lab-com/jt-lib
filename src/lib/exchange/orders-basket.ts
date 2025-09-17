@@ -89,20 +89,20 @@ export class OrdersBasket extends BaseObject {
       this.isInit = true;
       this.maxLeverage = getArgNumber('defaultLeverage', 10);
 
-      if (!isTester()) {
-        if (!this.symbolInfo) {
-          throw new BaseError('OrdersBasket::init symbolInfo is not defined for symbol ' + this.symbol, {
-            symbol: this.symbol,
-          });
-        }
-      } else {
-        //TODO update symbol info for futures in tester (then delete code below)
-        this.symbolInfo['limits']['amount']['min'] = 0.00001;
-
-        if (this._connectionName.includes('binance')) {
-          this.symbolInfo['limits']['cost']['min'] = 5;
-        }
-      }
+      // if (!isTester()) {
+      //   if (!this.symbolInfo) {
+      //     throw new BaseError('OrdersBasket::init symbolInfo is not defined for symbol ' + this.symbol, {
+      //       symbol: this.symbol,
+      //     });
+      //   }
+      // } else {
+      //   //TODO update symbol info for futures in tester (then delete code below)
+      //   this.symbolInfo['limits']['amount']['min'] = 0.00001;
+      //
+      //   if (this._connectionName.includes('binance')) {
+      //     this.symbolInfo['limits']['cost']['min'] = 5;
+      //   }
+      // }
 
       this.contractSize = this.symbolInfo.contractSize ?? 1;
       this.maxLeverage = this.symbolInfo['limits']['leverage']['max'] ?? this.maxLeverage;
@@ -122,7 +122,7 @@ export class OrdersBasket extends BaseObject {
         for (const order of openOrders) {
           const { clientOrderId } = order.clientOrderId;
 
-          this.ordersByClientId.set(clientOrderId, order);
+          this.ordersByClientId.set(clientOrderId, { ...order });
         }
       }
 
@@ -204,7 +204,7 @@ export class OrdersBasket extends BaseObject {
     //TODO write test for position update in websocket
     // await this.getPositions(true);
 
-    this.ordersByClientId.set(clientOrderId, order);
+    this.ordersByClientId.set(clientOrderId, { ...order });
     return await this.onOrderChange(order);
   }
 
@@ -226,6 +226,8 @@ export class OrdersBasket extends BaseObject {
     } else {
       warning('OrdersBasket::_cancelSecondSlTp', 'Opposite order not found', { oppositeId });
     }
+
+    log('OrdersBasket::_cancelSecondSlTp', orderId, { orderId, oppositeId, idToCancel });
   }
 
   async onOrderChange(order: Order): Promise<any> {
@@ -265,6 +267,7 @@ export class OrdersBasket extends BaseObject {
     }
 
     if (amountChange <= 0) {
+      this.posSlot[posSide] = await this.getPositionBySide(posSide as 'long' | 'short');
       throw new BaseError('OrdersBasket::_updatePosSlot amountChange <= 0', {
         posSide,
         isReduce,
@@ -508,6 +511,7 @@ export class OrdersBasket extends BaseObject {
 
     let order: Order;
 
+    const orderArgs = { symbol: this.symbol, type, side, amount, price, params: orderParams };
     try {
       order = await createOrder(this.symbol, type, side, amount, price, orderParams);
 
@@ -517,10 +521,10 @@ export class OrdersBasket extends BaseObject {
     } catch (e) {
       e.message = 'ExchangeAPI:: ' + e.message;
       throw new BaseError(e, {
-        marketInfo: await this.marketInfoShort(),
-        orderParams,
+        orderArgs,
         userParams,
         args,
+        marketInfo: await this.marketInfoShort(),
         e,
       });
     }
@@ -541,12 +545,12 @@ export class OrdersBasket extends BaseObject {
 
     if (!order.id) {
       error('OrdersBasket::createOrder', 'Order not created', {
-        marketInfo: await this.marketInfoShort(),
+        orderArgs,
+        userParams,
         order,
+        marketInfo: await this.marketInfoShort(),
         params,
         args,
-        orderParams,
-        userParams,
       });
 
       return order;
@@ -1125,6 +1129,10 @@ export class OrdersBasket extends BaseObject {
       if (this._connectionName.toLowerCase().includes('bybit')) {
         params['positionIdx'] = params['positionSide'] === 'long' ? '1' : '2';
       }
+
+      if (isTester()) {
+        allowedParams['positionSide'] = true;
+      }
     }
 
     if (this._connectionName.toLowerCase().includes('gateio')) {
@@ -1293,31 +1301,28 @@ export class OrdersBasket extends BaseObject {
         maxLeverage: this.maxLeverage,
       });
     }
-    // --- Set leverage ---
-    if (!isTester()) {
-      const levKey = this.LEVERAGE_INFO_KEY + this._connectionName + '-' + this.symbol;
-      const leverageInfo = Number(await globals.storage.get(levKey));
+    const levKey = this.LEVERAGE_INFO_KEY + this._connectionName + '-' + this.symbol;
+    const leverageInfo = !isTester() ? Number(await globals.storage.get(levKey)) : -1;
 
-      if (leverageInfo !== this.leverage) {
-        try {
-          const response = await setLeverage(this.leverage, this.symbol);
+    if (leverageInfo !== this.leverage) {
+      try {
+        const response = await setLeverage(this.leverage, this.symbol);
+        await globals.storage.set(levKey, this.leverage);
+        log('OrderBasket:setLeverage', this.leverage + ' ' + this.symbol, { response });
+      } catch (e) {
+        // bybit returns error if leverage already set, unfortunately there is no way to check leverage before set.
+        if (e.message.includes('leverage not modified') && e.message.includes('bybit')) {
+          log('OrderBasket:setLeverage', this.leverage + ' ' + this.symbol, {
+            message:
+              'bybit returns error if leverage already set, unfortunately there is no way to check leverage before set.',
+          });
           await globals.storage.set(levKey, this.leverage);
-          log('OrderBasket:setLeverage', this.leverage + ' ' + this.symbol, { response });
-        } catch (e) {
-          // bybit returns error if leverage already set, unfortunately there is no way to check leverage before set.
-          if (e.message.includes('leverage not modified') && e.message.includes('bybit')) {
-            log('OrderBasket:setLeverage', this.leverage + ' ' + this.symbol, {
-              message:
-                'bybit returns error if leverage already set, unfortunately there is no way to check leverage before set.',
-            });
-            await globals.storage.set(levKey, this.leverage);
-          } else {
-            throw new BaseError(e, { leverage: this.leverage, symbol: this.symbol, symbolInfo: this.symbolInfo });
-          }
+        } else {
+          throw new BaseError(e, { leverage: this.leverage, symbol: this.symbol, symbolInfo: this.symbolInfo });
         }
-      } else {
-        log('OrderBasket:setLeverage', 'Leverage already set', { leverage: this.leverage, symbol: this.symbol });
       }
+    } else {
+      log('OrderBasket:setLeverage', 'Leverage already set', { leverage: this.leverage, symbol: this.symbol });
     }
   }
 
