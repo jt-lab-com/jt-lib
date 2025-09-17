@@ -1,6 +1,6 @@
 import { ReportWidget } from './report-widget';
 import { log } from '../../core/log';
-export class ReportTVChart extends ReportWidget {
+export class ReportTvChart extends ReportWidget {
   // TVChartData {
   //     symbol: string;
   //     startTime: number;

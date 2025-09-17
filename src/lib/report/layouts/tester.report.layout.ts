@@ -54,30 +54,22 @@ export class TesterReportLayout extends BaseObject {
   async onStopTester() {
     try {
       const fee = getFee();
-      let feeCalc = 0;
+
       const profit = await getProfit();
       let volumeUsd = 0;
       let orders = await getOrders(ARGS.symbol);
 
       for (let order of orders) {
         if (order.status === 'closed') {
-          if (order.type === 'market') {
-            feeCalc += order.price * order.amount * ARGS.takerFee;
-          }
-
-          if (order.type === 'limit') {
-            feeCalc += order.price * order.amount * ARGS.makerFee;
-          }
-          volumeUsd += order.price * order.amount;
+          volumeUsd += order.cost;
         }
       }
-      let recoveryFactor = this.maxUpl ? (await getProfit()) / abs(this.maxUpl) : 'n/a';
+      const recoveryFactor = this.maxUpl ? (await getProfit()) / abs(this.maxUpl) : 'n/a';
 
-      // global.report.optimizedSetValue('Fee calc', feeCalc);
       globals.report.cardSetValue('Symbol', ARGS.symbol);
 
-      globals.report.cardSetValue('Fee', feeCalc);
-      //  global.report.cardSetValue('Fee calc', feeCalc);
+      globals.report.cardSetValue('Fee', getFee());
+
       globals.report.cardSetValue('Profit', profit);
 
       globals.report.cardSetValue('Max Drawdown', abs(this.maxUpl));
@@ -106,13 +98,11 @@ export class TesterReportLayout extends BaseObject {
       globals.report.optimizedSetValue('Days', testedDays);
       globals.report.optimizedSetValue('Spend (min)', this.getTesterSpend());
 
+      globals.report.tableUpdate('Orders real', orders.slice(0, 99));
       if (orders.length > 100) {
-        orders = orders.slice(1, 50).concat(orders.slice(-50));
-      } else {
-        orders = orders.slice(0, 100);
+        const last100 = min(100, orders.length - 100);
+        globals.report.tableUpdate('Orders real', orders.slice(-last100));
       }
-      //@ts-ignore
-      globals.report.tableUpdate('Orders real', orders);
 
       let sTimeStart = timeToString(this.startTimeTester);
       let sTimeEnd = timeToString(this.endTimeTester);
@@ -123,7 +113,7 @@ export class TesterReportLayout extends BaseObject {
       log(
         'TesterReportLayout::onStopTester',
         'onStopTester',
-        { fee, feeCalc, profit, volumeUsd, sTimeStart, sTimeEnd, secSpend, testedDays },
+        { fee, profit, volumeUsd, sTimeStart, sTimeEnd, secSpend, testedDays },
         true,
       );
     } catch (e) {
@@ -136,42 +126,31 @@ export class TesterReportLayout extends BaseObject {
   collectDataTester = async () => {
     let buyPrice = 0;
     let sellPrice = 0;
-    let posSizeBuy = 0;
-    let posSizeSell = 0;
     let uPnl = 0;
+    let sizeUsdSell = 0,
+      sizeUsdBuy = 0;
 
     try {
       this.iterator++;
-
-      // get first basket
-      let positions = await getPositions();
+      const positions = await getPositions();
 
       for (let i = 0; i < positions.length; i++) {
         const pos = positions[i];
         if (pos.side === 'long') {
           buyPrice = pos.entryPrice;
-          posSizeBuy = pos.contracts;
+          sizeUsdBuy = pos.notional;
         }
         if (pos.side === 'short') {
           sellPrice = pos.entryPrice;
-          posSizeSell = pos.contracts;
+          sizeUsdSell = pos.notional;
         }
 
         uPnl += pos.unrealizedPnl;
-
-        pos['uPnl'] = uPnl;
-        pos['id'] = timeToStrHms(tms()) + ' - ' + pos.side;
-        pos['lastprice'] = close();
       }
 
       this.maxUpl = min(this.maxUpl, uPnl); //
 
-      let profitApi = await getProfit();
-      // // debugger;
-      // if (isNaN(uPnl) || uPnl === null || uPnl === undefined) {
-      //   debugger;
-      //   trace('TesterReportLayout:collectDataTester + 1', 'uPnl is NaN', { positions, uPnl, buyPrice, sellPrice });
-      // }
+      const profitApi = await getProfit();
 
       globals.report.chartAddPointAgg('Profit/Drawdown', 'Zero', 0, 'last');
       globals.report.chartAddPointAgg('Profit/Drawdown', 'Profit', profitApi, 'max');
@@ -180,36 +159,24 @@ export class TesterReportLayout extends BaseObject {
       globals.report.fullReportChart.addPointAggByDate('Profit', profitApi, 'max');
       globals.report.fullReportChart.addPointAggByDate('Drawdown', uPnl, 'min');
 
-      let sizeUsdSell = posSizeSell * sellPrice;
-      let sizeUsdBuy = posSizeBuy * buyPrice;
-      let sizeUsd = sizeUsdSell + sizeUsdBuy;
+      const sizeUsd = sizeUsdSell + sizeUsdBuy;
 
       validateNumbersInObject({
         sizeUsd,
         sizeUsdBuy,
         sizeUsdSell,
-        posSizeBuy,
-        posSizeSell,
         uPnl,
         maxUsdSize: this.maxUsdSize,
       });
-
-      // globals.report.chartAddPointAgg('Position size', 'All Usd', sizeUsd ? sizeUsd : null, 'max');
-      // globals.report.chartAddPointAgg('Position size', 'Usd Buy', sizeUsdBuy ? sizeUsdBuy : null, 'max');
-      // globals.report.chartAddPointAgg('Position size', 'Usd Sell', sizeUsdSell ? sizeUsdSell : null, 'max');
-      //
-      // globals.report.chartAddPointAgg('Coin size', 'Zero', 0);
-      // globals.report.chartAddPointAgg('Coin size', 'Coin Buy', posSizeBuy ? posSizeBuy : null, 'max');
-      // globals.report.chartAddPointAgg('Coin size', 'Coin Sell', posSizeSell ? posSizeSell : null, 'max');
 
       globals.report.chartAddPointAgg('Price chart', 'Price', close());
       globals.report.chartAddPointAgg('Price chart', 'Entry Price Buy', buyPrice ? buyPrice : null);
       globals.report.chartAddPointAgg('Price chart', 'Entry Price Sell', sellPrice ? sellPrice : null);
 
-      this.maxUsdSize = max(sizeUsdBuy + sizeUsdSell, this.maxUsdSize);
+      this.maxUsdSize = max(sizeUsd, this.maxUsdSize);
       return { status: 'ok', updated: timeToString(tms()), iterator: this.iterator };
     } catch (e) {
-      error(e, { buyPrice, sellPrice, posSizeBuy, posSizeSell, uPnl });
+      error(e, { buyPrice, sellPrice, uPnl });
     }
   };
 
