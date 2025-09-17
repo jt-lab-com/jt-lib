@@ -1,2 +1,2 @@
-export { MainReport } from './mainReport';
+export { MainReport } from './main-report';
 export * from './widgets';
