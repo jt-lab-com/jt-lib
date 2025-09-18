@@ -30,6 +30,7 @@ services:
       - ./history-bars:/www/app/history-bars
       - ./markets.json:/www/app/markets.json
       - ./artifacts:/www/app/artifacts
+      - ./markets:/www/app/markets
 
 networks:
   default:
