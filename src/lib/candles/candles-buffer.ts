@@ -46,20 +46,11 @@ export class CandlesBuffer extends BaseObject {
 
     globals.events.subscribe('onTick', this.updateBuffer, this);
 
-    const startTimestamp = currentTime();
-    const startTime = startTimestamp - this.preloadCandlesCount * this.timeframeNumber * 1000 * 60;
+    const startInit = currentTime();
+    const startTime = startInit - this.preloadCandlesCount * this.timeframeNumber * 1000 * 60;
 
     try {
       const history = await getHistory(this.symbol, this.timeframeString, startTime, this.preloadCandlesCount + 1);
-
-      trace('CandlesBuffer:init', 'history', {
-        count: history.length,
-        startTime: startTime,
-        startTimestamp: startTimestamp,
-        timeframe: this.timeframeString,
-        startTimeHuman: timeToString(startTime),
-        preloadCandlesCount: this.preloadCandlesCount,
-      });
 
       if (history.length > 0) {
         this.buffer = history.map(([timestamp, open, high, low, close]) => ({
@@ -73,19 +64,26 @@ export class CandlesBuffer extends BaseObject {
         this.lastTimeUpdated = this.buffer[this.buffer.length - 1].timestamp;
 
         this.isInitialized = true;
-        log('CandlesBuffer:init', `Candles buffer initialized for symbol ${this.symbol}`, {
-          candlesCount: this.buffer.length,
+
+        log('CandlesBuffer:init', `${this.timeframeString} ${this.symbol}`, {
+          count: history.length,
+          startTime: startTime,
+          startTimeHuman: timeToString(startTime),
+          startTimestamp: startInit,
+          startInitHuman: timeToString(startInit),
           timeframe: this.timeframeString,
-          startDate: timeToString(this.buffer[0]['timestamp']) ?? 'no data',
-          endDate: timeToString(this.buffer[this.buffer.length - 1]['timestamp']) ?? 'no data',
-          maxBufferLength: this.maxBufferLength,
+
           preloadCandlesCount: this.preloadCandlesCount,
+          candlesCount: this.buffer.length,
+          bufferStartDate: timeToString(this.buffer[0]['timestamp']) ?? 'no data',
+          bufferEndDate: timeToString(this.buffer[this.buffer.length - 1]['timestamp']) ?? 'no data',
+          maxBufferLength: this.maxBufferLength,
         });
       } else {
         warning('CandlesBuffer:init', `No candles loaded for symbol ${this.symbol}`, {
           timeframe: this.timeframeString,
           startDate: timeToString(startTime),
-          endDate: timeToString(startTimestamp),
+          endDate: timeToString(startInit),
           preloadCandlesCount: this.preloadCandlesCount,
         });
       }
