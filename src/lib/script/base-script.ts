@@ -59,13 +59,17 @@ export class BaseScript extends BaseObject {
           this.symbols = [symbol];
         }
       }
-    }
 
-    if (this.symbols.length === 0) {
-      throw new BaseError('BaseScript::constructor symbols is not defined');
+      if (this.connectionName.toLowerCase().includes('mock')) {
+        this.hedgeMode = true; //for mock connections always hedge mode
+      }
     }
+    //Symbols could be set in derived class constructor
+    // if (this.symbols.length === 0) {
+    //   throw new BaseError('BaseScript::constructor symbols is not defined');
+    // }
 
-    const idPrefix = 'Global'; //
+    const idPrefix = 'GL-'; //
     globals.script = this;
 
     globals.events = new EventEmitter({ idPrefix });
