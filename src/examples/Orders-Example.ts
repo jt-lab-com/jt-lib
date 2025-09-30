@@ -110,7 +110,6 @@ class Script extends BaseScript {
     // Symbol information buttons
     globals.report.createActionButton('Symbol Info', 'symbolInfo', this.symbol, this.symbolInfoCallback);
     globals.report.createActionButton('Current Price', 'price', this.symbol, this.priceCallback);
-    globals.report.createActionButton('Contract Size Info', 'contractInfo', this.symbol, this.contractInfoCallback);
 
     // Market orders
     globals.report.createActionButton('Buy Market', 'buyMarket', this.symbol, this.buyMarketCallback);
@@ -326,10 +325,10 @@ class Script extends BaseScript {
 
     for (const position of positions) {
       if (position.contracts !== 0) {
-        const result = await this.orderBasket.closePosition(position.symbol);
+        const result = await this.orderBasket.closePosition(position.side, position.contracts);
         results.push({ symbol: position.symbol, result });
       }
-    }˚
+    }
 
     await this.handleApiResult('Close All Positions', results);
   };
