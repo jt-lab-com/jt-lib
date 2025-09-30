@@ -297,7 +297,8 @@ export class OrdersBasket extends BaseObject {
     }
 
     position.contracts = isZero(position.contracts) ? 0 : position.contracts;
-    position.notional = this.getUsdAmount(position.contracts, position.entryPrice);
+
+    this._updatePosition(position);
 
     if (position.contracts < 0) {
       throw new BaseError('OrderBasket::_updatePosSlot posSlot.size < 0', {
@@ -325,7 +326,14 @@ export class OrdersBasket extends BaseObject {
       position,
       order,
     });
+
     return pnl;
+  }
+
+  _updatePosition(pos: Position) {
+    pos.unrealizedPnl = positionProfit(pos.side, pos.entryPrice, this.close(), pos.contracts, this.contractSize);
+    pos.notional = this.getUsdAmount(pos.contracts, pos.entryPrice);
+    pos.initialMargin = pos.notional / pos.leverage;
   }
 
   async beforeOnPnlChange(order: Order): Promise<any> {
@@ -918,6 +926,7 @@ export class OrdersBasket extends BaseObject {
       isForce = true;
       this.isGetPositionsForced = false;
     }
+
     const positions = await getPositions([this.symbol], { forceFetch: isForce });
 
     if (!isTester() && globals.isDebug) {
@@ -1168,19 +1177,16 @@ export class OrdersBasket extends BaseObject {
     // getOpenOrders is not working in tester mode, use getOrders and filter by status
     if (isTester()) {
       const orders = [];
-
       for (const order of await this.getOrders()) {
         if (order.status === 'open') {
           orders.push(order);
         }
       }
-
       return orders;
     }
 
     try {
       since = since ?? currentTime() - 7 * 24 * 60 * 60 * 1000; // 7 days by default
-
       return await getOpenOrders(this.symbol, since, limit, params);
     } catch (e) {
       throw new BaseError(e, await this.marketInfoShort());
