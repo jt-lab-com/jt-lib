@@ -66,8 +66,6 @@ export class RuntimeReportLayout extends BaseObject {
 
     this._startDate = currentTime();
 
-    globals.report.createChart('Profit/Drawdown', { chartType: ChartType.Area });
-
     //set default Title and description
     // Note: globals.strategy is not available in current type definitions
   }
@@ -82,15 +80,6 @@ export class RuntimeReportLayout extends BaseObject {
       //shift
       globals.report.clearTable('ALL Orders');
       this.dataOrders.shift();
-    }
-  }
-
-  addProfit(profit = 0, symbol = '') {
-    this.profit += profit;
-    globals.report.cardSetValue('Profit', this.profit);
-
-    if (!isTester()) {
-      globals.report.chartAddPoint('Profit', 'Profit', this.profit);
     }
   }
 
