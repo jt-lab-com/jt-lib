@@ -38,16 +38,16 @@ class Script extends BaseScript {
   ];
 
   // Strategy configuration
-  hedgeMode = true;  // Enable hedge mode for futures trading
-  sizeUsd: number;   // Position size in USD
+  hedgeMode = true; // Enable hedge mode for futures trading
+  sizeUsd: number; // Position size in USD
 
   // Technical indicators
-  private sma14: SimpleMovingAverageIndicator;  // 200-period SMA
-  private art14: AverageTrueRange;              // 14-period ATR
-  
+  private sma14: SimpleMovingAverageIndicator; // 200-period SMA
+  private art14: AverageTrueRange; // 14-period ATR
+
   // Report and data components
   private reportLayout: StandardReportLayout;
-  private buffer: CandlesBuffer;                // Candles buffer for historical data
+  private buffer: CandlesBuffer; // Candles buffer for historical data
 
   constructor(params: GlobalARGS) {
     super(params);
@@ -57,16 +57,17 @@ class Script extends BaseScript {
     // Initialize standard report layout
     this.reportLayout = new StandardReportLayout();
 
-    // Create SMA indicator: 200-period on 1-hour timeframe
-    this.sma14 = await globals.indicators.sma(this.symbols[0], '1h', 200);
-    
-    // Create ATR indicator: 14-period on 1-hour timeframe
-    this.art14 = await globals.indicators.atr(this.symbols[0], '1h', 14);
-    
+    // Create SMA indicator: 25-period on 1m timeframe
+    this.sma14 = await globals.indicators.sma(this.symbols[0], '1m', 25);
+    globals.report.tableUpdate('sma14 onInit', this.sma14.getIndicatorValues());
+
+    // Create ATR indicator: 14-period on 1m timeframe
+    this.art14 = await globals.indicators.atr(this.symbols[0], '1m', 14);
+
     // Get candles buffer for historical data access
-    this.buffer = await globals.candlesBufferService.getBuffer({ 
-      symbol: this.symbols[0], 
-      timeframe: '1h' 
+    this.buffer = await globals.candlesBufferService.getBuffer({
+      symbol: this.symbols[0],
+      timeframe: '1h',
     });
 
     // Log indicator information for debugging
@@ -77,15 +78,16 @@ class Script extends BaseScript {
    * Called on every price tick
    * Updates charts with current indicator values
    */
+  iterator = 0;
   async onTick(): Promise<void> {
     // Add SMA value to chart
-    globals.report.chartAddPointAgg('SMA', 'sma14', this.sma14.getValue());
-    
+    globals.report.chartAddPoint('SMA', 'sma14', this.sma14.getValue());
+
     // Add current price to chart
-    globals.report.chartAddPointAgg('SMA', 'price', close());
-    
+    globals.report.chartAddPoint('SMA', 'price', close());
+
     // Add ATR value to chart
-    globals.report.chartAddPointAgg('ATR', 'atr14', this.art14.getValue());
+    globals.report.chartAddPoint('ATR', 'atr14', this.art14.getValue());
   }
 
   /**
