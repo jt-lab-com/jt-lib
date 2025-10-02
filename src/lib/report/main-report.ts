@@ -476,6 +476,13 @@ export class MainReport extends BaseObject {
     this.charts[chartName].addPointByDate(lineName, pointValue, options?.lineColor);
   }
 
+  chartAddPointXY(chartName: string, lineName: string, x: number, y: number, options?: ExtendedReportChartOptions) {
+    if (!this.charts[chartName]) {
+      this.createChart(chartName, options);
+    }
+    this.charts[chartName].addPoint(lineName, x, y, options?.lineColor);
+  }
+
   dropActionButton(action: string) {
     delete this.actionButtons[action];
 
