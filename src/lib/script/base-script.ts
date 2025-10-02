@@ -24,7 +24,6 @@ export class BaseScript extends BaseObject {
   balanceTotal: number;
   balanceFree: number;
   _testerStartRealTime: number;
-  _testerEndRealTime: number;
 
   isInitialized = false;
   closedOrdersId: Record<string, string> = {};
@@ -45,19 +44,14 @@ export class BaseScript extends BaseObject {
     } else {
       //TODO make symbolsInfo available in constructor
       if (!this.symbols?.length) {
-        let symbol = '';
-        let symbolsLine = getArgString('symbols', '');
+        const symbolsLine = getArgString('symbols', '');
 
-        let symbols = symbolsLine.split(',');
+        const symbols = symbolsLine.split(',');
         symbols.forEach((symbol) => {
           if (symbol.includes('/')) {
             this.symbols.push(symbol.trim());
           }
         });
-
-        if (symbol !== '' && this.symbols.length === 0) {
-          this.symbols = [symbol];
-        }
       }
 
       if (this.connectionName.toLowerCase().includes('mock')) {
@@ -85,24 +79,40 @@ export class BaseScript extends BaseObject {
     }
   }
 
-  async onStop() {}
-  async onInit() {}
+  async onStop() {
+    //override
+  }
+  async onInit() {
+    //override
+  }
 
   //async onBeforeTick() {}
-
-  async onTick() {}
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onTick() {
+    //override
+  }
 
   // async onAfterTick() {}
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onOrderChange(order: Order) {
+    //override
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onArgsUpdate(args: GlobalARGS) {
+    //override
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onReportAction(action: string, payload: any) {
+    //override
+  }
 
-  async onOrderChange(order: Order) {}
-
-  async onArgsUpdate(args: GlobalARGS) {}
-
-  async onReportAction(action: string, payload: any) {}
-
-  async onTimer() {}
-
-  async onEvent(event: string, data: any) {}
+  async onTimer() {
+    //override
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onEvent(event: string, data: any) {
+    //override
+  }
 
   onError = async (e: any): Promise<never | void> => {
     throw e;
@@ -133,6 +143,7 @@ export class BaseScript extends BaseObject {
   }
 
   _isTickLocked = false;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected async runOnTick(data: Tick) {
     // log('BaseScript::runOnTick', 'Run onTick', { data, iterator: this.iterator }, true);
     if (this._isTickLocked) {
@@ -239,7 +250,7 @@ export class BaseScript extends BaseObject {
     }
   };
 
-  async runOnEvent(event, data: any) {
+  async runOnEvent(event: string, data: any) {
     try {
       await this.onEvent(event, data);
       await globals.events.emit('onEvent', { event, data });
