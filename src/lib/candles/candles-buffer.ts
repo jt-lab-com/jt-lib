@@ -37,6 +37,10 @@ export class CandlesBuffer extends BaseObject {
     return this.buffer;
   }
 
+  get length() {
+    return this.buffer.length;
+  }
+
   clear() {
     this.buffer = [];
   }
@@ -134,6 +138,7 @@ export class CandlesBuffer extends BaseObject {
   getCandle(shift: number): Candle {
     return this.buffer[this.buffer.length - 1 - shift];
   }
+
   private updateCurrentCandle(currentPrice: number) {
     this.currentCandle.high = Math.max(currentPrice, this.currentCandle.high);
     this.currentCandle.low = Math.min(currentPrice, this.currentCandle.low);
@@ -144,22 +149,22 @@ export class CandlesBuffer extends BaseObject {
     return this.lastTimeUpdated;
   }
 
-  close() {
-    return this.buffer[this.buffer.length - 1].close;
+  close(index = 0) {
+    return this.buffer[this.buffer.length - 1 - index].close;
   }
-  high() {
-    return this.buffer[this.buffer.length - 1]?.high;
+  high(index = 0) {
+    return this.buffer[this.buffer.length - 1 - index]?.high;
   }
-  low() {
-    return this.buffer[this.buffer.length - 1]?.low;
+  low(index = 0) {
+    return this.buffer[this.buffer.length - 1 - index]?.low;
   }
-  open() {
-    return this.buffer[this.buffer.length - 1]?.open;
+  open(index = 0) {
+    return this.buffer[this.buffer.length - 1 - index]?.open;
   }
-  volume() {
-    return this.buffer[this.buffer.length - 1]?.volume;
+  volume(index = 0) {
+    return this.buffer[this.buffer.length - 1 - index]?.volume;
   }
-  tms() {
-    return this.buffer[this.buffer.length - 1]?.timestamp;
+  tms(index = 0) {
+    return this.buffer[this.buffer.length - 1 - index]?.timestamp;
   }
 }
