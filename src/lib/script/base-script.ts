@@ -109,25 +109,17 @@ export class BaseScript extends BaseObject {
   };
 
   protected async init() {
-    try {
-      await globals.storage.init();
-      let balanceInfo = await getBalance();
-      this.balanceTotal = balanceInfo.total.USDT;
-      this.balanceFree = balanceInfo.free.USDT;
-      log('BaseScript::init', 'getBalance', balanceInfo, true);
-    } catch (e) {
-      throw new BaseError(e, {});
-    } finally {
-      this.isInitialized = false;
-    }
-
-    let initInfo = {
-      balanceTotal: this.balanceTotal,
-      balanceFree: this.balanceFree,
-      symbols: this.symbols,
-      hedgeMode: this.hedgeMode,
-      ARGS,
-    };
+    // try {
+    //   await globals.storage.init();
+    //   let balanceInfo = await getBalance();
+    //   this.balanceTotal = balanceInfo.total.USDT;
+    //   this.balanceFree = balanceInfo.free.USDT;
+    //   log('BaseScript::init', 'getBalance', balanceInfo, true);
+    // } catch (e) {
+    //   throw new BaseError(e, {});
+    // } finally {
+    //   this.isInitialized = false;
+    // }
 
     try {
       this.isInitialized = true;

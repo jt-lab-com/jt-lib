@@ -1,4 +1,5 @@
 export interface ExchangeParams {
+  marketType: 'swap' | 'future' | 'spot';
   symbol: string;
   connectionName?: string;
   hedgeMode?: boolean;

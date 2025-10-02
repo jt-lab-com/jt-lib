@@ -21,6 +21,7 @@ import { sleep } from '../utils/misc';
 export class OrdersBasket extends BaseObject {
   LEVERAGE_INFO_KEY = 'exchange-leverage-info-';
   readonly triggerService: TriggerService;
+  marketType = 'swap' as 'swap' | 'future' | 'spot';
   protected readonly symbol: string;
   protected _connectionName: string;
   protected hedgeMode = false;
@@ -61,6 +62,7 @@ export class OrdersBasket extends BaseObject {
     this.symbol = params.symbol; // TODO validate symbol
     this.leverage = params.leverage ?? this.leverage;
     this.hedgeMode = params.hedgeMode || getArgBoolean('hedgeMode', undefined) || false;
+    this.marketType = params?.marketType || (getArgString('marketType', 'swap') as 'swap' | 'future' | 'spot');
 
     this.setPrefix(params.prefix);
 
@@ -87,28 +89,6 @@ export class OrdersBasket extends BaseObject {
       this.symbolInfo = await this.getSymbolInfo();
       logOnce('OrdersBasket::getSymbolInfo ' + this.symbol, 'symbolInfo', this.symbolInfo);
       this.isInit = true;
-      this.maxLeverage = getArgNumber('defaultLeverage', 10);
-
-      // if (!isTester()) {
-      //   if (!this.symbolInfo) {
-      //     throw new BaseError('OrdersBasket::init symbolInfo is not defined for symbol ' + this.symbol, {
-      //       symbol: this.symbol,
-      //     });
-      //   }
-      // } else {
-      //   //TODO update symbol info for futures in tester (then delete code below)
-      //   this.symbolInfo['limits']['amount']['min'] = 0.00001;
-      //
-      //   if (this._connectionName.includes('binance')) {
-      //     this.symbolInfo['limits']['cost']['min'] = 5;
-      //   }
-      // }
-
-      this.contractSize = this.symbolInfo.contractSize ?? 1;
-      this.maxLeverage = this.symbolInfo['limits']['leverage']['max'] ?? this.maxLeverage;
-      this.updateLimits();
-
-      await this.setLeverage(this.leverage);
 
       if (this.triggerType !== 'script' && this.triggerType !== 'exchange') {
         throw new BaseError('OrdersBasket::init', 'Wrong trigger type ' + this.triggerType);
@@ -127,8 +107,18 @@ export class OrdersBasket extends BaseObject {
       }
 
       //Positions slot initialization
-      this.posSlot['long'] = await this.getPositionBySide('long', true);
-      this.posSlot['short'] = await this.getPositionBySide('short');
+
+      if (this.marketType === 'swap' || this.marketType === 'future') {
+        this.maxLeverage = getArgNumber('defaultLeverage', 10);
+        this.contractSize = this.symbolInfo.contractSize ?? 1;
+        this.maxLeverage = this.symbolInfo['limits']['leverage']['max'] ?? this.maxLeverage;
+        this.updateLimits();
+
+        await this.setLeverage(this.leverage);
+
+        this.posSlot['long'] = await this.getPositionBySide('long', true);
+        this.posSlot['short'] = await this.getPositionBySide('short');
+      }
 
       log('OrdersBasket::init', '', this.orderBasketInfo(), true);
     } catch (e) {
