@@ -440,6 +440,11 @@ declare global {
 
   function systemUsage(): { cpu: number; memory: number };
 
+  function subscribeChannel(channel: string, callback: (data: unknown) => void);
+  function publishChannel(channel: string, data: unknown, toJSON = false);
+  function unsubscribeChannel(channel: string);
+  function unsubscribeAllChannels();
+
   const axios: any;
 
   const getUserId: () => string;
