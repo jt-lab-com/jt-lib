@@ -12,6 +12,7 @@ import { Indicators } from '../indicators';
 export class BaseScript extends BaseObject {
   MAX_ORDERS = 10000;
   connectionName: string; //required
+  marketType: 'spot' | 'futures' | 'swap'; //required
   symbols: string[] = []; //required
   interval: number; // if set - onTimer are called every interval instead of onTick
 
@@ -63,6 +64,7 @@ export class BaseScript extends BaseObject {
     //   throw new BaseError('BaseScript::constructor symbols is not defined');
     // }
 
+    this.marketType = getArgString('marketType', 'swap') as 'spot' | 'futures' | 'swap';
     const idPrefix = 'GL-'; //
     globals.script = this;
 
