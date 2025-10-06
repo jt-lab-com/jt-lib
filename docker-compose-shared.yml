@@ -8,7 +8,6 @@ services:
       - PORT=80
       - STRATEGY_FILES_PATH=/www/app/strategy-files/
       - DATABASE_URL=file:/www/app/storage/storage.db
-      - MARKETS_DIR_PATH=/www/app/markets
       - ARTIFACTS_DIR_PATH=/www/app/artifacts
       - LOGS_DIR_PATH=/www/app/artifacts
       - HISTORY_BARS_PATH=/www/app/history-bars
@@ -29,9 +28,7 @@ services:
       - ./src:/www/app/strategy-files
       - ./storage:/www/app/storage
       - ./history-bars:/www/app/history-bars
-      - ./markets.json:/www/app/markets.json
       - ./artifacts:/www/app/artifacts
-      - ./markets:/www/app/markets
       - ./exchanges.txt:/www/app/exchanges.txt
 
 networks:
