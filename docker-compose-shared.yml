@@ -20,7 +20,7 @@ services:
       - "APP_PORT=${APP_PORT}"
       - "APP_VERSION=${APP_VERSION}"
       - "APP_NAME=${APP_NAME}"
-      - EXCHANGE_LIST_FILE_PATH=/www/app/exchanges.txt
+      - EXCHANGE_LIST_FILE_PATH=/www/app/exchanges.conf
     user: $USER
     ports:
       - "${APP_PORT}:80"
@@ -29,7 +29,6 @@ services:
       - ./storage:/www/app/storage
       - ./history-bars:/www/app/history-bars
       - ./artifacts:/www/app/artifacts
-      - ./exchanges.txt:/www/app/exchanges.txt
 
 networks:
   default:
