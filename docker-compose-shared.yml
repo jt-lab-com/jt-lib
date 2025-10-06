@@ -21,6 +21,7 @@ services:
       - "APP_PORT=${APP_PORT}"
       - "APP_VERSION=${APP_VERSION}"
       - "APP_NAME=${APP_NAME}"
+      - EXCHANGE_LIST_FILE_PATH=/www/app/exchanges.txt
     user: $USER
     ports:
       - "${APP_PORT}:80"
@@ -31,6 +32,7 @@ services:
       - ./markets.json:/www/app/markets.json
       - ./artifacts:/www/app/artifacts
       - ./markets:/www/app/markets
+      - ./exchanges.txt:/www/app/exchanges.txt
 
 networks:
   default:
