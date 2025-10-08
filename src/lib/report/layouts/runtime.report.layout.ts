@@ -23,11 +23,7 @@ export class RuntimeReportLayout extends BaseObject {
   private profit = 0;
   private dataOrders = [];
 
-  constructor(
-    args = {
-      isByTimer: false,
-    },
-  ) {
+  constructor(args: any) {
     super(args);
 
     this.timmeUntilFastUpdate = currentTime() + 5 * 60 * 1000; // 5 min
@@ -63,6 +59,7 @@ export class RuntimeReportLayout extends BaseObject {
     globals.events.subscribe('onOrderChange', this.collectOrdersRuntime, this);
 
     globals.events.subscribe('onReportAction', this.onReportAction, this);
+    globals.events.subscribe('onAfterStop', this.onStop, this);
 
     this._startDate = currentTime();
 
@@ -70,7 +67,11 @@ export class RuntimeReportLayout extends BaseObject {
     // Note: globals.strategy is not available in current type definitions
   }
 
-  updateReport = async (args) => {
+  async onStop() {
+    log('RuntimeReportLayout::onStop', 'Stopping RuntimeReportLayout', {}, true);
+    await this.updateReport({});
+  }
+  updateReport = async (args = {}) => {
     await globals.report.updateReport();
   };
 
