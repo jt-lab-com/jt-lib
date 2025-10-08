@@ -141,11 +141,16 @@ export const percentDifference = (a: number, b: number, isAbs = false): number =
   return isAbs ? Math.abs(result) : result;
 };
 
-export function round(number: number, digits = 2): number {
+export function round(number: number, digits = 2, isDown = false): number {
   if (isNaN(number) || isNaN(digits)) {
     throw new BaseError('round: at least one of argument is NaN', { number, digits });
   }
-  return parseFloat(number.toFixed(digits));
+  if (isDown) {
+    const factor = Math.pow(10, digits);
+    return Math.floor(number * factor) / factor; // 1.005 => 1.00   1.4999 => 1.49
+  }
+
+  return parseFloat(number.toFixed(digits)); // 1.005 => 1.01   1.4999 => 1.5
 }
 export function rand(min: number, max: number) {
   if (isNaN(min) || isNaN(max)) {
