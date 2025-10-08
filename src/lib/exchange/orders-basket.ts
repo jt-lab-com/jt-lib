@@ -15,7 +15,7 @@ import { getArgBoolean, getArgNumber, getArgString, uniqueId } from '../core/bas
 import { globals } from '../core/globals';
 import { currentTime, timeToString } from '../utils/date-time';
 import { positionProfit } from './heplers';
-import { isZero, normalize, validateNumbersInObject } from '../utils/numbers';
+import { isZero, normalize, rand, validateNumbersInObject } from '../utils/numbers';
 import { sleep } from '../utils/misc';
 
 export class OrdersBasket extends BaseObject {
@@ -45,6 +45,7 @@ export class OrdersBasket extends BaseObject {
 
   isInit = false;
   private isGetPositionsForced: boolean;
+  isMock = false;
 
   constructor(params: ExchangeParams) {
     super(params);
@@ -63,7 +64,7 @@ export class OrdersBasket extends BaseObject {
     this.leverage = params.leverage ?? this.leverage;
     this.hedgeMode = params.hedgeMode || getArgBoolean('hedgeMode', undefined) || false;
     this.marketType = params?.marketType || (getArgString('marketType', 'swap') as 'swap' | 'future' | 'spot');
-
+    this.isMock = this.connectionName.toLowerCase().includes('mock');
     this.setPrefix(params.prefix);
 
     globals.events.subscribeOnOrderChange(this.beforeOnPnlChange, this, this.symbol);
@@ -125,6 +126,12 @@ export class OrdersBasket extends BaseObject {
       this.isInit = false;
       throw new BaseError(e);
     }
+    await this.mockDelay();
+  }
+
+  mockDelay() {
+    if (!this.isMock) return;
+    return sleep(rand(300, 700));
   }
   orderBasketInfo() {
     return {
@@ -525,7 +532,10 @@ export class OrdersBasket extends BaseObject {
         marketInfo: await this.marketInfoShort(),
         e,
       });
+    } finally {
+      await this.mockDelay();
     }
+
     if (this.connectionName.includes('bybit') && !isTester() && order.id) {
       //TODO emulate order for bybit (bybit return only id) -> move it to Environment
 
@@ -673,6 +683,8 @@ export class OrdersBasket extends BaseObject {
       return order;
     } catch (e) {
       throw new BaseError(e, { ...args, order: this.ordersByClientId.get(orderId) });
+    } finally {
+      await this.mockDelay();
     }
   }
 
@@ -698,6 +710,8 @@ export class OrdersBasket extends BaseObject {
       return order;
     } catch (e) {
       throw new BaseError(e, { orderId, symbol: this.symbol });
+    } finally {
+      await this.mockDelay();
     }
   }
 
@@ -912,6 +926,15 @@ export class OrdersBasket extends BaseObject {
   }
 
   async getPositions(isForce = false) {
+    if (this.marketType === 'spot') {
+      if (!this.posSlot['long']) {
+        this.posSlot['long'] = this.emulatePosition('long');
+        this.posSlot['short'] = this.emulatePosition('short');
+      }
+
+      return [Object.values(this.posSlot)];
+    }
+
     if (this.isGetPositionsForced) {
       isForce = true;
       this.isGetPositionsForced = false;
