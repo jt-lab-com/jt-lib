@@ -32,6 +32,11 @@ export class BaseScript extends BaseObject {
     super(args);
     this._testerStartRealTime = Date.now();
 
+    if (getArgString('connectionName', '').toLowerCase().includes('mock')) {
+      ARGS.hedgeMode = true;
+      warning('BaseScript::constructor', 'Mock connection detected, enabling hedgeMode', {}, true);
+    }
+
     log('Script:constructor', '=============Constructor(v 2.6)=============', { args }, true);
     try {
       this.connectionName = getArgString('connectionName', undefined, true);
@@ -53,10 +58,6 @@ export class BaseScript extends BaseObject {
             this.symbols.push(symbol.trim());
           }
         });
-      }
-
-      if (this.connectionName.toLowerCase().includes('mock')) {
-        this.hedgeMode = true; //for mock connections always hedge mode
       }
     }
     //Symbols could be set in derived class constructor
