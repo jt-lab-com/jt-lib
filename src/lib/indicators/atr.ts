@@ -7,6 +7,7 @@ import { MaBuffer } from './utils/ma-buffer';
 import { BaseError } from '../core/errors';
 import { timeCurrent, timeToString } from '../utils/date-time';
 import { roundTimeByTimeframe } from '../utils/timeframe';
+import { error, warning, warningOnce } from '../core/log';
 
 interface AverageTrueRangeOptions {
   symbol: string;
@@ -26,6 +27,7 @@ export class AverageTrueRange extends BaseIndicator {
 
   constructor(buffer: CandlesBuffer, options: AverageTrueRangeOptions) {
     super(options.symbol, options.timeframe, buffer);
+
     if (!options.period || options.period < 1) {
       throw new BaseError('ATR: period must be >1', { buffer, options });
     }
@@ -40,16 +42,18 @@ export class AverageTrueRange extends BaseIndicator {
     return abs(c.high - c.low);
   }
 
-  protected onCalculate() {
+  onCalculate() {
     const candles = this.candlesBuffer.getCandles();
-    if (candles.length < this.period + 1) return { msg: 'Not enough candles to calculate' };
-
-    const cTime = roundTimeByTimeframe(timeCurrent(), this.timeframe);
-    const lastCandleTime = candles[candles.length - 1].timestamp; // get last full candle timestamp
-
-    if (cTime === lastCandleTime) {
-      return { msg: 'No calculate on current candle ', lastCandleTime, cTime };
+    if (candles.length < this.period + 1) {
+      warningOnce('ATR: Not enough candles to calculate ATR', '', {
+        candlesLength: candles.length,
+        period: this.period,
+      });
+      return { msg: 'Not enough candles to calculate' };
     }
+
+    if (this.lastTimeUpdated >= this.candlesBuffer.getLastTimeUpdated()) return;
+    if (candles.length <= this.period) return;
 
     try {
       for (let i = this.lastIndex; i < candles.length - 1; i++) {
@@ -58,10 +62,11 @@ export class AverageTrueRange extends BaseIndicator {
         this.avg.addValue(tr);
         if (i >= this.period) {
           this.buffer.push({ timestamp: candles[i].timestamp, value: this.avg.getValue() });
+          //globals.report.chartAddPointXY('ART debug', 'atr', candles[i].timestamp, this.avg.getValue());
         }
       }
       this.lastIndex = candles.length - 1;
-      this.lastTimeUpdated = lastCandleTime;
+      this.lastTimeUpdated = candles[candles.length - 1].timestamp;
     } catch (e) {
       throw new BaseError(e, {
         candlesLength: candles.length,
