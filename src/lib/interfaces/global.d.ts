@@ -33,7 +33,7 @@ declare global {
   export type Candle = CandleTypes.Candle;
   export type OHLC = CandleTypes.OHLC;
 
-  export type TimeFrame = '1m' | '5m' | '15m' | '1h' | '1d';
+  export type TimeFrame = '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
 
   export type ReportData = ReportTypes.ReportData;
   export type ReportBlock = ReportTypes.ReportBlock;

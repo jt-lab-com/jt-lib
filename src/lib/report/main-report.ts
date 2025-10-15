@@ -413,7 +413,7 @@ export class MainReport extends BaseObject {
   createTable(tableName: string, options?: any, layoutIndex?: number) {
     if (this.tables[tableName]) return;
 
-    this.tables[tableName] = new ReportTable(tableName);
+    this.tables[tableName] = new ReportTable({ title: tableName, name: tableName, ...options });
 
     if (this.isSetLayoutIndexByDefault) {
       this.setLayoutIndex('table', tableName, layoutIndex);

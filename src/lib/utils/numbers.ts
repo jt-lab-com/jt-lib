@@ -21,7 +21,7 @@ export const validateNumbers = (...args: any[]): boolean => {
   return true;
 };
 
-export const validateNumbersInObject = (obj: any, showWarning = true): boolean => {
+export const validateNumbersInObject = (obj: any, showWarning = false): boolean => {
   if (typeof obj !== 'object') {
     throw new BaseError('The argument must be an object');
   }
@@ -33,8 +33,9 @@ export const validateNumbersInObject = (obj: any, showWarning = true): boolean =
     }
   }
 
-  if (wrongKeys.length > 0 && showWarning) {
-    warning('validateNumbersInObject', 'All values of the object must be valid numbers. Wrong keys: ', wrongKeys);
+  if (wrongKeys.length > 0) {
+    if (showWarning)
+      warning('validateNumbersInObject', 'All values of the object must be valid numbers. Wrong keys: ', wrongKeys);
     return false;
   }
   return true;

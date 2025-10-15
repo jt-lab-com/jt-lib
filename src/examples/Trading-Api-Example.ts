@@ -174,6 +174,7 @@ class Script extends BaseScript {
   private buyMarketCallback = async () => {
     const amount = this.orderBasket.getContractsAmount(this.sizeUsd);
     const result = await this.orderBasket.buyMarket(amount);
+
     await this.handleApiResult('buyMarket', result);
   };
 

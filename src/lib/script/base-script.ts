@@ -189,7 +189,7 @@ export class BaseScript extends BaseObject {
     }
   };
 
-  protected runOnTimer = async () => {
+  protected async runOnTimer() {
     try {
       this.iterator++;
       await this.onTimer();
@@ -197,7 +197,7 @@ export class BaseScript extends BaseObject {
     } catch (e) {
       await this.runOnError(e);
     }
-  };
+  }
 
   protected runOnOrderChange = async (orders: Order[]) => {
     try {

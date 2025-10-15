@@ -83,32 +83,22 @@ class Script extends BaseScript {
     trace('Script:showChart', `Adding ${len} points to chart ${chartName}`, {}, true);
     let candleBuff = indicator.getCandlesBuffer();
     for (let i = len - 1; i >= 0; i--) {
-      //
       const val = indicator.getValue(i);
+
       const time = indicator.getTimestamp(i);
       const name = indicator.constructor?.name ?? 'Indicator';
+
+      // if (!val || !time) {
+      //   debugger;
+      // }
       globals.report.chartAddPointXY(chartName, name, time, val);
       if (isAddPrice) {
         globals.report.chartAddPointXY(chartName, 'Price', time, candleBuff.close(i));
-        // globals.report.chartAddPointXY(chartName + 0, 'Diff', time, candles[i].timestamp - time);
       }
     }
   }
 
   iterator = 0;
-  async onTick(): Promise<void> {
-    if (this.nextTime < timeCurrent()) {
-      // Add SMA value to chart
-      globals.report.chartAddPoint('SMA', 'sma14', this.sma14.getValue());
-
-      // // Add current price to chart
-      // globals.report.chartAddPoint('SMA', 'price', close());
-
-      // Add ATR value to chart
-      globals.report.chartAddPoint('ATR', 'atr14', this.art14.getValue());
-      this.nextTime = timeCurrent() + 60 * 1000;
-    }
-  }
 
   /**
    * Called when script stops

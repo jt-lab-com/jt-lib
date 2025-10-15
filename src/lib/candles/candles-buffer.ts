@@ -63,6 +63,34 @@ export class CandlesBuffer extends BaseObject {
     };
   }
 
+  getShiftByTimestamp(timestamp: number) {
+    timestamp = roundTimeByTimeframe(timestamp, this.timeframeNumber);
+    const lastCandle = this.buffer[this.buffer.length - 1];
+
+    if (!lastCandle) {
+      error('CandlesBuffer:getShiftByTimestamp', `No values in buffer for ${this.symbol} `, {
+        info: this.getInfo(),
+        timestamp,
+        humanTime: timeToString(timestamp),
+      });
+      return null;
+    }
+
+    const shift = Math.round((lastCandle.timestamp - timestamp) / (this.timeframeNumber * 1000 * 60));
+
+    if (shift < 0 || shift >= this.buffer.length) {
+      warning('CandlesBuffer:getShiftByTimestamp', `Value not found by timestamp ${this.symbol}`, {
+        shift,
+        timestamp,
+        humanTime: timeToString(timestamp),
+        info: this.getInfo(),
+      });
+      return null;
+    }
+
+    return shift;
+  }
+
   getCandleByTimestamp(timestamp: number): Candle | null {
     timestamp = roundTimeByTimeframe(timestamp, this.timeframeNumber);
     const lastCandle = this.buffer[this.buffer.length - 1];
@@ -134,12 +162,17 @@ export class CandlesBuffer extends BaseObject {
     let wrongCandlesCount = 0;
     let holesTimes = [];
 
+    //b
     lastValidCandle = this.buffer[0];
-    for (let i = 0; i < this.buffer.length; i++) {
+    for (let i = 1; i < this.buffer.length; i++) {
       const { timestamp, open, high, low, close, volume } = this.buffer[i];
 
-      if (abs(timestamp - lastValidCandle.timestamp) > this.timeframeNumber * 1000 * 60) {
+      const candlesDiff = timestamp - lastValidCandle.timestamp;
+      if (candlesDiff !== this.timeframeNumber * 1000 * 60) {
         holesTimes.push({ time: timeToString(timestamp), diffSec: abs(timestamp - lastValidCandle.timestamp) / 1000 });
+      }
+      if (candlesDiff === 0) {
+        continue; //same candle
       }
       if (
         !isRealNumber(timestamp) ||
@@ -171,7 +204,7 @@ export class CandlesBuffer extends BaseObject {
       warning(
         'CandlesBuffer:normalizeCandles',
         `Found ${holesTimes.length} holes in candles for ${this.symbol} ${this.timeframeString}`,
-        { holesTimes: holesTimes.slice(-5) },
+        { holesTimes: holesTimes.slice(-5), ...this.getInfo() },
       );
     }
   }
@@ -183,20 +216,40 @@ export class CandlesBuffer extends BaseObject {
   }
 
   async loadHistory(startTime: number, count: number) {
-    const loops = round(this.MAX_CANDLES_REQUEST / count, 0, true) + 1;
+    const loops = round(count / this.MAX_CANDLES_REQUEST, 0, true) + 1;
+
+    log('CandlesBuffer:loadHistory', '', {
+      startTime: startTime,
+      startTimeHuman: timeToString(startTime),
+      count: count,
+      loops: loops,
+      info: this.getInfo(),
+    });
 
     for (let i = 0; i < loops; i++) {
       count = loops === 1 ? count : this.MAX_CANDLES_REQUEST;
-      startTime = startTime + i * count * this.timeframeNumber * 1000 * 60;
+
+      // log(
+      //   'CandlesBuffer:loadHistory',
+      //   `Loading loop ${i + 1}/${loops}`,
+      //   {
+      //     startTime: startTime,
+      //     humanStartTime: timeToString(startTime),
+      //     i,
+      //     count,
+      //   },
+      //   true,
+      // );
       await this.loadHistoryA(startTime, count);
+      startTime = startTime + count * this.timeframeNumber * 1000 * 60;
     }
   }
   async loadHistoryA(startTime: number, count: number, direction: 'back' | 'forward' = 'forward') {
     const startInit = currentTime();
 
     try {
-      const history = await getHistory(this.symbol, this.timeframeString, startTime, this.preloadCandlesCount + 1);
-      trace('CandlesBuffer:initialize', `Loaded ${history.length} candles for ${this.symbol}`, {
+      const history = await getHistory(this.symbol, this.timeframeString, startTime, count + 1);
+      trace('CandlesBuffer:loadHistoryA', `Loaded ${history.length} candles for ${this.symbol}`, {
         history: history.slice(-5),
       });
       if (history.length > 0) {
@@ -265,7 +318,13 @@ export class CandlesBuffer extends BaseObject {
         });
       }
     } catch (e) {
-      error(e);
+      error(e, {
+        count,
+        startTime,
+        humanStartTime: timeToString(startTime),
+        timeframe: this.timeframeString,
+        symbol: this.symbol,
+      });
     }
   }
 

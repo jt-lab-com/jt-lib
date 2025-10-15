@@ -8,11 +8,17 @@ export class ReportTable extends ReportWidget {
   private rows: Record<string, TableRow> = {};
   private counter = 0;
   private MAX_ROWS = 300;
+  title: string;
 
-  constructor(private readonly title: string) {
+  constructor(options: { title?: string; isVisible?: boolean }) {
     super();
+    this.title = options.title || 'Table';
+    this.isVisible = options.isVisible !== undefined ? options.isVisible : true;
   }
 
+  get length() {
+    return Object.keys(this.rows).length;
+  }
   setMaxRows(maxRows: number) {
     this.MAX_ROWS = maxRows;
   }

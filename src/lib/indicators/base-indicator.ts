@@ -1,12 +1,15 @@
 import { BaseObject } from '../core/base-object';
-import { error, trace } from '../core/log';
+import { error, trace, warning, warningOnce } from '../core/log';
 import { BufferIndicatorItem } from './types';
 import type { CandlesBuffer } from '../candles';
 import { timeToString } from '../utils/date-time';
+import { convertTimeframeToNumber, roundTimeByTimeframe } from '../utils/timeframe';
+import { isRealNumber } from '../utils/numbers';
 
 export class BaseIndicator extends BaseObject {
   protected readonly symbol: string;
   protected readonly timeframe: string;
+  protected readonly timeframeNumber: number;
   protected candlesBuffer: CandlesBuffer;
   protected buffer: BufferIndicatorItem[] = [];
 
@@ -19,8 +22,7 @@ export class BaseIndicator extends BaseObject {
 
     this.symbol = symbol;
     this.timeframe = timeframe;
-
-    trace('Indicator:constructor', className, this.getInfo());
+    this.timeframeNumber = convertTimeframeToNumber(timeframe);
   }
 
   getCandlesBuffer() {
@@ -35,11 +37,28 @@ export class BaseIndicator extends BaseObject {
     this.buffer = [];
   }
 
+  getValueByTimestamp(timestamp: number) {
+    const shift = this.candlesBuffer.getShiftByTimestamp(timestamp);
+
+    const value = this.getValue(shift);
+    if (isRealNumber(value)) {
+      return value;
+    } else {
+      warningOnce(
+        'BaseIndicator:getValueByTimestamp',
+        `Value not found by timestamp ${timeToString(timestamp)}`,
+        { info: this.getInfo(), shift, timestamp, humanTime: timeToString(timestamp) },
+        60 * 1000,
+      );
+      return null;
+    }
+  }
+
   getValue(shift = 0) {
-    return this.buffer[this.buffer.length - shift]?.value;
+    return this.buffer[this.buffer.length - 1 - shift]?.value;
   }
   getTimestamp(shift = 0) {
-    return this.buffer[this.buffer.length - shift]?.timestamp;
+    return this.buffer[this.buffer.length - 1 - shift]?.timestamp;
   }
 
   getIndicatorValues() {

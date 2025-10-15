@@ -36,7 +36,7 @@ export class OrdersBasket extends BaseObject {
   protected leverage = 1;
   protected prefix: string;
   protected maxLeverage: number;
-  contractSize: number;
+  contractSize = 1;
   _minContractQuoted: number;
   _minContractBase: number;
   _minContractStep: number;
@@ -108,10 +108,10 @@ export class OrdersBasket extends BaseObject {
       }
 
       //Positions slot initialization
+      this.contractSize = this.symbolInfo.contractSize ?? 1;
 
       if (this.marketType === 'swap' || this.marketType === 'future') {
         this.maxLeverage = getArgNumber('defaultLeverage', 10);
-        this.contractSize = this.symbolInfo.contractSize ?? 1;
         this.maxLeverage = this.symbolInfo['limits']['leverage']['max'] ?? this.maxLeverage;
         this.updateLimits();
 
@@ -119,6 +119,9 @@ export class OrdersBasket extends BaseObject {
 
         this.posSlot['long'] = await this.getPositionBySide('long', true);
         this.posSlot['short'] = await this.getPositionBySide('short');
+      } else {
+        this.posSlot['long'] = this.emulatePosition('long');
+        this.posSlot['short'] = this.emulatePosition('short');
       }
 
       log('OrdersBasket::init', '', this.orderBasketInfo(), true);
@@ -126,6 +129,7 @@ export class OrdersBasket extends BaseObject {
       this.isInit = false;
       throw new BaseError(e);
     }
+
     await this.mockDelay();
   }
 
@@ -400,11 +404,21 @@ export class OrdersBasket extends BaseObject {
     const args = { type, side, amount, price, params };
 
     if (!this.isInit) throw new BaseError('OrdersBasket::createOrder - OrdersBasket is not initialized', args);
-    if (validateNumbersInObject({ amount, price }) === false)
-      throw new BaseError('OrdersBasket::createOrder - wrong amount or price', args);
-    if (amount <= 0) throw new BaseError('OrdersBasket::createOrder amount must be > 0', args);
+    if (validateNumbersInObject({ amount, price }, false) === false)
+      throw new BaseError('OrdersBasket::createOrder - wrong amount or price', {
+        args,
+        ...(await this.marketInfoShort()),
+      });
+    if (amount <= 0)
+      throw new BaseError('OrdersBasket::createOrder amount must be > 0', {
+        args,
+        ...(await this.marketInfoShort()),
+      });
     if (!['sell', 'buy'].includes(side))
-      throw new BaseError('OrdersBasket::createOrder side must be buy or sell', args);
+      throw new BaseError('OrdersBasket::createOrder side must be buy or sell', {
+        args,
+        ...(await this.marketInfoShort()),
+      });
 
     if (this.hedgeMode) {
       params['positionSide'] = side === 'buy' ? 'long' : 'short';
