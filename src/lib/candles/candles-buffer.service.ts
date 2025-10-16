@@ -1,13 +1,12 @@
 import { BaseObject } from '../core/base-object';
 import { CandlesBuffer, CandlesBufferOptions } from './candles-buffer';
-import { convertTimeframeToString } from '../utils/timeframe';
 
 export class CandlesBufferService extends BaseObject {
   private readonly bufferMap: Record<string, CandlesBuffer> = {};
 
   async getBuffer(options: CandlesBufferOptions): Promise<CandlesBuffer> {
     const { symbol, timeframe } = options;
-    const key = `${symbol}-${convertTimeframeToString(timeframe)}`;
+    const key = `${symbol}-${timeframe}`;
 
     if (this.bufferMap[key]) return this.bufferMap[key];
 

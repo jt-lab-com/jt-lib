@@ -23,7 +23,11 @@ export class RuntimeReportLayout extends BaseObject {
   private profit = 0;
   private dataOrders = [];
 
-  constructor(args: any) {
+  constructor(
+    args = {
+      isByTimer: false,
+    },
+  ) {
     super(args);
 
     this.timmeUntilFastUpdate = currentTime() + 5 * 60 * 1000; // 5 min
@@ -59,19 +63,16 @@ export class RuntimeReportLayout extends BaseObject {
     globals.events.subscribe('onOrderChange', this.collectOrdersRuntime, this);
 
     globals.events.subscribe('onReportAction', this.onReportAction, this);
-    globals.events.subscribe('onAfterStop', this.onStop, this);
 
     this._startDate = currentTime();
+
+    globals.report.createChart('Profit/Drawdown', { chartType: ChartType.Area });
 
     //set default Title and description
     // Note: globals.strategy is not available in current type definitions
   }
 
-  async onStop() {
-    log('RuntimeReportLayout::onStop', 'Stopping RuntimeReportLayout', {}, true);
-    await this.updateReport({});
-  }
-  updateReport = async (args = {}) => {
+  updateReport = async (args) => {
     await globals.report.updateReport();
   };
 
@@ -81,6 +82,15 @@ export class RuntimeReportLayout extends BaseObject {
       //shift
       globals.report.clearTable('ALL Orders');
       this.dataOrders.shift();
+    }
+  }
+
+  addProfit(profit = 0, symbol = '') {
+    this.profit += profit;
+    globals.report.cardSetValue('Profit', this.profit);
+
+    if (!isTester()) {
+      globals.report.chartAddPoint('Profit', 'Profit', this.profit);
     }
   }
 

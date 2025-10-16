@@ -76,7 +76,7 @@ export function getArgBoolean(
   let result: boolean;
 
   if (typeof args[argName] === 'string') {
-    result = args[argName].toLowerCase() === 'true';
+    result = args[argName] === 'true';
   } else {
     if (args[argName]) {
       result = Boolean(args[argName]);

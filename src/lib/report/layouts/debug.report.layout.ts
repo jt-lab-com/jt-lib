@@ -92,27 +92,7 @@ export class DebugReportLayout extends BaseObject {
     globals.report.createActionButton('👾 Emitters', 'isDebugAllEvents', '1');
     globals.report.createActionButton('👾 Objects', 'isDebugCheckAllObjects', '1');
     globals.report.createActionButton('👾System Usage', 'isDebugSystemUsage', '1');
-    globals.report.createActionButton('👾 Open Orders', 'openOrders', '1', this.showOpenOrders);
-    globals.report.createActionButton('👾 Closed Orders', 'closedOrders', '1', this.showClosedOrders);
   }
-
-  showClosedOrders = async () => {
-    const symbols = globals.script.symbols;
-
-    for (const symbol of symbols) {
-      const since = currentTime() - 24 * 60 * 60 * 1000;
-      const orders = await getClosedOrders(symbol, since, 20);
-      globals.report.tableUpdate('👾 Closed Orders', orders, 'id');
-    }
-  };
-  showOpenOrders = async () => {
-    const symbols = globals.script.symbols;
-
-    for (const symbol of symbols) {
-      const orders = await getOpenOrders(symbol);
-      globals.report.tableUpdate('👾 Open Orders', orders, 'id');
-    }
-  };
   async showData() {
     if (this.isDebugAllPositions) await debugAllPositions();
     if (this.isDebugAllTriggers) debugAllTriggers();
