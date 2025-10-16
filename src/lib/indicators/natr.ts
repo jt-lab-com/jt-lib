@@ -4,24 +4,24 @@ import { CandlesBuffer } from '../candles';
 import { BaseError } from '../core/errors';
 import { MaBuffer } from './utils/ma-buffer';
 
-interface NormalizedAverageRangeTrueOptions {
+interface NormalizedAverageTrueRangeOptions {
   symbol: string;
   timeframe: TimeFrame;
   period: number;
 }
 
-export class NormalizedAverageRangeTrue extends BaseIndicator {
+export class NormalizedAverageTrueRange extends BaseIndicator {
   private readonly period: number;
   private lastIndex = 0;
   private lastTimeUpdated = 0;
 
   avg: MaBuffer;
 
-  constructor(buffer: CandlesBuffer, options: NormalizedAverageRangeTrueOptions) {
+  constructor(buffer: CandlesBuffer, options: NormalizedAverageTrueRangeOptions) {
     super(options.symbol, options.timeframe, buffer);
 
     if (!options.period || options.period < 1) {
-      throw new BaseError('NART: period must be >1', { buffer, options });
+      throw new BaseError('NATR: period must be >1', { buffer, options });
     }
 
     this.period = options.period;
@@ -46,18 +46,18 @@ export class NormalizedAverageRangeTrue extends BaseIndicator {
 
         this.avg.addValue(tr);
 
-        // Only calculate NART when we have enough data for the period
+        // Only calculate NATR when we have enough data for the period
         if (i >= this.period - 1) {
           const atr = this.avg.getValue();
           if (atr !== undefined) {
             const closePrice = candles[i].close;
 
-            // Calculate NART as percentage: (ATR / Close Price) * 100
-            const nart = closePrice > 0 ? (atr / closePrice) * 100 : 0;
+            // Calculate NATR as percentage: (ATR / Close Price) * 100
+            const natr = closePrice > 0 ? (atr / closePrice) * 100 : 0;
 
             this.buffer.push({
               timestamp: candles[i].timestamp,
-              value: normalize(nart, 4), // 4 decimal places for percentage
+              value: natr,
             });
           }
         }
@@ -85,7 +85,7 @@ export class NormalizedAverageRangeTrue extends BaseIndicator {
   getValue(shift = 0): number {
     this.onCalculate();
     const idx = this.buffer.length - 1 - shift;
-    return idx >= 0 ? this.buffer[idx]?.value : undefined;
+    return this.buffer[idx]?.value;
   }
 
   getInfo() {
@@ -93,8 +93,9 @@ export class NormalizedAverageRangeTrue extends BaseIndicator {
     return {
       ...baseInfo,
       period: this.period,
-      indicatorType: 'NART',
-      description: 'Normalized Average Range True - ATR as percentage of close price',
+      indicatorType: 'NATR',
+      description: 'Normalized Average True Range - ATR as percentage of close price',
     };
   }
 }
+
