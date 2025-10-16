@@ -1,6 +1,4 @@
 import { ReportWidget } from './report-widget';
-import { trace } from '../../core/log';
-import { globals } from '../../core/globals';
 
 export type TableRow = object;
 
@@ -8,17 +6,11 @@ export class ReportTable extends ReportWidget {
   private rows: Record<string, TableRow> = {};
   private counter = 0;
   private MAX_ROWS = 300;
-  title: string;
 
-  constructor(options: { title?: string; isVisible?: boolean }) {
+  constructor(private readonly title: string) {
     super();
-    this.title = options.title || 'Table';
-    this.isVisible = options.isVisible !== undefined ? options.isVisible : true;
   }
 
-  get length() {
-    return Object.keys(this.rows).length;
-  }
   setMaxRows(maxRows: number) {
     this.MAX_ROWS = maxRows;
   }
@@ -40,10 +32,16 @@ export class ReportTable extends ReportWidget {
     return true;
   }
 
+  clear() {
+    this.rows = {};
+    this.counter = 0;
+
+    return true;
+  }
   update(row: TableRow, idField = 'id'): boolean {
     let id = this.getIdFromRow(row, idField);
 
-    if (this.rows[id] === undefined) {
+    if (this.rows[idField] === undefined) {
       return false;
     }
 
@@ -52,18 +50,11 @@ export class ReportTable extends ReportWidget {
   }
 
   upsert(row: TableRow, idField = 'id') {
-    const id = this.getIdFromRow(row, idField);
-    if (this.rows[id]) {
-      return this.update(row, idField);
-    } else {
+    if (!row[idField] || !this.rows[idField]) {
       return this.insert(row, idField);
+    } else {
+      return this.update(row, idField);
     }
-  }
-  clear() {
-    this.rows = {};
-    this.counter = 0;
-
-    return true;
   }
 
   insertRecords(rows: TableRow[], idField = 'id') {

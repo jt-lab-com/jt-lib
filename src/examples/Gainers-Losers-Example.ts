@@ -124,12 +124,12 @@ class Script extends BaseScript {
     // Filter for USDT linear swap symbols
     this.swapSymbols = [];
 
-    for (let symbol in symbolsData) {
+    for (let symbol in markets) {
       const si = markets[symbol];
       const symbolData = symbolsData[symbol] || {};
 
       // Filter for active USDT linear swap symbols
-      if (1) {
+      if (si.swap && si.active && si.linear && si.quote === 'USDT') {
         this.swapSymbols.push({
           ...si,
           info: undefined,
@@ -142,7 +142,6 @@ class Script extends BaseScript {
     // Create report tables
     globals.report.createTable('Gainers And Losers');
     globals.report.tableUpdate('Available Swap Symbols', this.swapSymbols);
-    await globals.report.updateReport();
   }
 
   // Rate limiting: wait until next analysis cycle

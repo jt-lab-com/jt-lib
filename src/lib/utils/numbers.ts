@@ -21,7 +21,7 @@ export const validateNumbers = (...args: any[]): boolean => {
   return true;
 };
 
-export const validateNumbersInObject = (obj: any, showWarning = false): boolean => {
+export const validateNumbersInObject = (obj: any, showWarning = true): boolean => {
   if (typeof obj !== 'object') {
     throw new BaseError('The argument must be an object');
   }
@@ -33,9 +33,8 @@ export const validateNumbersInObject = (obj: any, showWarning = false): boolean 
     }
   }
 
-  if (wrongKeys.length > 0) {
-    if (showWarning)
-      warning('validateNumbersInObject', 'All values of the object must be valid numbers. Wrong keys: ', wrongKeys);
+  if (wrongKeys.length > 0 && showWarning) {
+    warning('validateNumbersInObject', 'All values of the object must be valid numbers. Wrong keys: ', wrongKeys);
     return false;
   }
   return true;
@@ -142,16 +141,11 @@ export const percentDifference = (a: number, b: number, isAbs = false): number =
   return isAbs ? Math.abs(result) : result;
 };
 
-export function round(number: number, digits = 2, isDown = false): number {
+export function round(number: number, digits = 2): number {
   if (isNaN(number) || isNaN(digits)) {
     throw new BaseError('round: at least one of argument is NaN', { number, digits });
   }
-  if (isDown) {
-    const factor = Math.pow(10, digits);
-    return Math.floor(number * factor) / factor; // 1.005 => 1.00   1.4999 => 1.49
-  }
-
-  return parseFloat(number.toFixed(digits)); // 1.005 => 1.01   1.4999 => 1.5
+  return parseFloat(number.toFixed(digits));
 }
 export function rand(min: number, max: number) {
   if (isNaN(min) || isNaN(max)) {

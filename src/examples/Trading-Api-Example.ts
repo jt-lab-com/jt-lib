@@ -25,6 +25,8 @@ Usage:
 - callback receives { action, value } parameters
 - callback is called directly when button is clicked
 - No need to handle all actions in one switch statement
+
+
 */
 
 class Script extends BaseScript {
@@ -43,6 +45,7 @@ class Script extends BaseScript {
     },
   ];
 
+  hedgeMode = true;
   sizeUsd: any;
   symbol: string;
   orderBasket: OrdersBasket;
@@ -58,17 +61,23 @@ class Script extends BaseScript {
   onInit = async () => {
     // Create a new OrdersBasket instance
     this.orderBasket = new OrdersBasket({
+      hedgeMode: this.hedgeMode,
       symbol: this.symbols[0],
+      connectionName: this.connectionName,
       triggerType: 'exchange',
     });
     await this.orderBasket.init();
 
     globals.report.setTitle('Trading API Callback Example');
-    globals.report.setDescription(
+    globals.report.createText(
+      'info1',
       `Exchange: ${this.connectionName}, Symbol: ${this.symbol}, Hedge Mode: ${this.hedgeMode}`,
+      {
+        align: 'center',
+        variant: 'h4',
+      },
     );
 
-    await this.handleApiResult('Basket Info', this.orderBasket.orderBasketInfo());
     this.reportLayout = new StandardReportLayout();
     await this.createButtonsWithCallbacks();
   };
@@ -115,116 +124,207 @@ class Script extends BaseScript {
   };
   // Callback functions for each button
   private symbolInfoCallback = async () => {
-    const result = await this.orderBasket.getSymbolInfo();
-    await this.handleApiResult('symbolInfo', result);
+    try {
+      const result = await this.orderBasket.getSymbolInfo();
+      globals.report.tableUpdate('API Call Results', { method: 'symbolInfo', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('symbolInfo', e);
+    }
   };
 
   private tmsCallback = async () => {
-    const result = timeCurrent();
-    await this.handleApiResult('tms', result);
+    try {
+      const result = timeCurrent();
+      globals.report.tableUpdate('API Call Results', { method: 'tms', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('tms', e);
+    }
   };
 
   private priceCallback = async () => {
-    const result = this.orderBasket.price();
-    await this.handleApiResult('price', result);
+    try {
+      const result = this.orderBasket.price();
+      globals.report.tableUpdate('API Call Results', { method: 'price', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('price', e);
+    }
   };
 
   private volumeCallback = async () => {
-    const result = this.orderBasket.volume();
-    await this.handleApiResult('volume', result);
+    try {
+      const result = this.orderBasket.volume();
+      globals.report.tableUpdate('API Call Results', { method: 'volume', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('volume', e);
+    }
   };
 
   private askCallback = async () => {
-    const result = { ask: this.orderBasket.ask(), askVolume: this.orderBasket.askVolume() };
-    await this.handleApiResult('ask', result);
+    try {
+      const result = { ask: this.orderBasket.ask(), askVolume: this.orderBasket.askVolume() };
+      globals.report.tableUpdate('API Call Results', { method: 'ask', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('ask', e);
+    }
   };
 
   private bidCallback = async () => {
-    const result = { bid: this.orderBasket.bid(), bidVolume: this.orderBasket.bidVolume() };
-    await this.handleApiResult('bid', result);
+    try {
+      const result = { bid: this.orderBasket.bid(), bidVolume: this.orderBasket.bidVolume() };
+      globals.report.tableUpdate('API Call Results', { method: 'bid', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('bid', e);
+    }
   };
 
   private getPositionsCallback = async () => {
-    const result = await this.orderBasket.getPositions();
-    await this.handleApiResult('getPositions', result);
+    try {
+      const result = await this.orderBasket.getPositions();
+      globals.report.tableUpdate('API Call Results', { method: 'getPositions', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('getPositions', e);
+    }
   };
 
   private getOrdersCallback = async () => {
-    const result = this.orderBasket.getOrders();
-    await this.handleApiResult('getOrders', result);
+    try {
+      const result = this.orderBasket.getOrders();
+      globals.report.tableUpdate('API Call Results', { method: 'getOrders', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('getOrders', e);
+    }
   };
 
   private getBalanceCallback = async () => {
-    const result = await getBalance();
-    await this.handleApiResult('getBalance', result);
+    try {
+      const result = await getBalance();
+      globals.report.tableUpdate('API Call Results', { method: 'getBalance', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('getBalance', e);
+    }
   };
 
   private getProfitCallback = async () => {
-    const result = await getProfit();
-    await this.handleApiResult('getProfit', result);
+    try {
+      const result = await getProfit();
+      globals.report.tableUpdate('API Call Results', { method: 'getProfit', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('getProfit', e);
+    }
   };
 
   private getHistoryCallback = async () => {
-    const timeFrom = tms() - 1000 * 60 * 60 * 24 * 7; // 7 days
-    const result = await getHistory(this.symbol, '1m', timeFrom, 10);
-    log('getHistory', '', result);
-    await this.handleApiResult('getHistory', result);
+    try {
+      const timeFrom = tms() - 1000 * 60 * 60 * 24 * 7; // 7 days
+      const result = await getHistory(this.symbol, '1m', timeFrom, 10);
+      log('getHistory', '', result);
+      globals.report.tableUpdate('API Call Results', { method: 'getHistory', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('getHistory', e);
+    }
   };
 
   private buyMarketCallback = async () => {
-    const amount = this.orderBasket.getContractsAmount(this.sizeUsd);
-    const result = await this.orderBasket.buyMarket(amount);
-
-    await this.handleApiResult('buyMarket', result);
+    try {
+      const amount = this.orderBasket.getContractsAmount(this.sizeUsd);
+      const result = await this.orderBasket.buyMarket(amount);
+      globals.report.tableUpdate('API Call Results', { method: 'buyMarket', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('buyMarket', e);
+    }
   };
 
   private createOrderCallback = async () => {
-    const limitPrice = this.orderBasket.close() * 0.7;
-    const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
-    const result = await this.orderBasket.createOrder('limit', 'buy', amount, limitPrice, {});
-    await this.handleApiResult('createOrder', result);
+    try {
+      const limitPrice = this.orderBasket.close() * 0.7;
+      const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
+      const result = await this.orderBasket.createOrder('limit', 'buy', amount, limitPrice, {});
+      globals.report.tableUpdate('API Call Results', { method: 'createOrder', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('createOrder', e);
+    }
   };
 
   private buyLimitCallback = async () => {
-    const limitPrice = this.orderBasket.close() * 0.7;
-    const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
-    const result = await this.orderBasket.buyLimit(amount, limitPrice);
-    await this.handleApiResult('buyLimit', result);
+    try {
+      const limitPrice = this.orderBasket.close() * 0.7;
+      const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
+      const result = await this.orderBasket.buyLimit(amount, limitPrice);
+      globals.report.tableUpdate('API Call Results', { method: 'buyLimit', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('buyLimit', e);
+    }
   };
 
   private modifyOrderCallback = async () => {
-    const limitPrice = this.orderBasket.close() * 0.7;
-    const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
+    try {
+      const limitPrice = this.orderBasket.close() * 0.7;
+      const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
 
-    await sleep(1000); // wait for the order to be created
+      await sleep(1000); // wait for the order to be created
 
-    const order = await this.orderBasket.buyLimit(amount, limitPrice);
-    const result = await this.orderBasket.modifyOrder(order.id, 'limit', 'buy', amount, limitPrice * 1.05);
-    await this.handleApiResult('modifyOrder', result);
+      const order = await this.orderBasket.buyLimit(amount, limitPrice);
+      const result = await this.orderBasket.modifyOrder(order.id, 'limit', 'buy', amount, limitPrice * 1.05);
+      globals.report.tableUpdate('API Call Results', { method: 'modifyOrder', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('modifyOrder', e);
+    }
   };
 
   private cancelOrderCallback = async () => {
-    const limitPrice = this.orderBasket.close() * 0.7;
-    const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
-    const order = await this.orderBasket.buyLimit(amount, limitPrice);
+    try {
+      const limitPrice = this.orderBasket.close() * 0.7;
+      const amount = this.orderBasket.getContractsAmount(this.sizeUsd, limitPrice);
+      const order = await this.orderBasket.buyLimit(amount, limitPrice);
 
-    const result = await this.orderBasket.cancelOrder(order.id);
-    await this.handleApiResult('cancelOrder', result);
+      const result = await this.orderBasket.cancelOrder(order.id);
+      globals.report.tableUpdate('API Call Results', { method: 'cancelOrder', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('cancelOrder', e);
+    }
   };
 
   private getOpenOrdersCallback = async () => {
-    const result = await getOpenOrders(this.symbol);
-    await this.handleApiResult('getOpenOrders', result);
+    try {
+      const result = await getOpenOrders(this.symbol);
+      globals.report.tableUpdate('API Call Results', { method: 'getOpenOrders', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('getOpenOrders', e);
+    }
   };
 
   private getClosedOrdersCallback = async () => {
-    const result = await getClosedOrders(this.symbol);
-    await this.handleApiResult('getClosedOrders', result);
+    try {
+      const result = await getClosedOrders(this.symbol);
+      globals.report.tableUpdate('API Call Results', { method: 'getClosedOrders', result });
+      await globals.report.updateReport();
+    } catch (e) {
+      await this.handleError('getClosedOrders', e);
+    }
   };
 
-  // Helper method for handling API results
-  private handleApiResult = async (method: string, result: any) => {
+  // Helper method for error handling
+  private handleError = async (method: string, e: any) => {
+    const result = 'Error: ' + e.message;
     globals.report.tableUpdate('API Call Results', { method, result });
+    error(e, { method, result });
     await globals.report.updateReport();
   };
 

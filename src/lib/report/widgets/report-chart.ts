@@ -68,7 +68,7 @@ export class ReportChart extends ReportWidget {
       const shift = Math.round(this.MAX_POINTS * 0.25);
       this.x.splice(0, shift);
       for (let line in this.lines) {
-        this.lines[line].splice(0, shift);
+        this.lines[line].splice(0, shift - 1);
       }
       log('ReportCharts::updatePointsToChart()', ' Too many points in chart. Max points: ' + this.MAX_POINTS);
     }
