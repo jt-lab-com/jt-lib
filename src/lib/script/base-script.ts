@@ -12,6 +12,7 @@ import { Indicators } from '../indicators';
 export class BaseScript extends BaseObject {
   MAX_ORDERS = 10000;
   connectionName: string; //required
+  marketType: 'spot' | 'futures' | 'swap'; //required
   symbols: string[] = []; //required
   interval: number; // if set - onTimer are called every interval instead of onTick
 
@@ -24,13 +25,17 @@ export class BaseScript extends BaseObject {
   balanceTotal: number;
   balanceFree: number;
   _testerStartRealTime: number;
-  _testerEndRealTime: number;
 
   isInitialized = false;
   closedOrdersId: Record<string, string> = {};
   constructor(args: GlobalARGS) {
     super(args);
     this._testerStartRealTime = Date.now();
+
+    if (getArgString('connectionName', '').toLowerCase().includes('mock')) {
+      ARGS.hedgeMode = true;
+      warning('BaseScript::constructor', 'Mock connection detected, enabling hedgeMode', {}, true);
+    }
 
     log('Script:constructor', '=============Constructor(v 2.6)=============', { args }, true);
     try {
@@ -45,27 +50,23 @@ export class BaseScript extends BaseObject {
     } else {
       //TODO make symbolsInfo available in constructor
       if (!this.symbols?.length) {
-        let symbol = '';
-        let symbolsLine = getArgString('symbols', '');
+        const symbolsLine = getArgString('symbols', '');
 
-        let symbols = symbolsLine.split(',');
+        const symbols = symbolsLine.split(',');
         symbols.forEach((symbol) => {
           if (symbol.includes('/')) {
             this.symbols.push(symbol.trim());
           }
         });
-
-        if (symbol !== '' && this.symbols.length === 0) {
-          this.symbols = [symbol];
-        }
       }
     }
+    //Symbols could be set in derived class constructor
+    // if (this.symbols.length === 0) {
+    //   throw new BaseError('BaseScript::constructor symbols is not defined');
+    // }
 
-    if (this.symbols.length === 0) {
-      throw new BaseError('BaseScript::constructor symbols is not defined');
-    }
-
-    const idPrefix = 'Global'; //
+    this.marketType = getArgString('marketType', 'swap') as 'spot' | 'futures' | 'swap';
+    const idPrefix = 'GL-'; //
     globals.script = this;
 
     globals.events = new EventEmitter({ idPrefix });
@@ -81,49 +82,57 @@ export class BaseScript extends BaseObject {
     }
   }
 
-  async onStop() {}
-  async onInit() {}
+  async onStop() {
+    //override
+  }
+  async onInit() {
+    //override
+  }
 
   //async onBeforeTick() {}
-
-  async onTick() {}
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onTick() {
+    //override
+  }
 
   // async onAfterTick() {}
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onOrderChange(order: Order) {
+    //override
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onArgsUpdate(args: GlobalARGS) {
+    //override
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onReportAction(action: string, payload: any) {
+    //override
+  }
 
-  async onOrderChange(order: Order) {}
-
-  async onArgsUpdate(args: GlobalARGS) {}
-
-  async onReportAction(action: string, payload: any) {}
-
-  async onTimer() {}
-
-  async onEvent(event: string, data: any) {}
+  async onTimer() {
+    //override
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async onEvent(event: string, data: any) {
+    //override
+  }
 
   onError = async (e: any): Promise<never | void> => {
     throw e;
   };
 
   protected async init() {
-    try {
-      await globals.storage.init();
-      let balanceInfo = await getBalance();
-      this.balanceTotal = balanceInfo.total.USDT;
-      this.balanceFree = balanceInfo.free.USDT;
-      log('BaseScript::init', 'getBalance', balanceInfo, true);
-    } catch (e) {
-      throw new BaseError(e, {});
-    } finally {
-      this.isInitialized = false;
-    }
-
-    let initInfo = {
-      balanceTotal: this.balanceTotal,
-      balanceFree: this.balanceFree,
-      symbols: this.symbols,
-      hedgeMode: this.hedgeMode,
-      ARGS,
-    };
+    // try {
+    //   await globals.storage.init();
+    //   let balanceInfo = await getBalance();
+    //   this.balanceTotal = balanceInfo.total.USDT;
+    //   this.balanceFree = balanceInfo.free.USDT;
+    //   log('BaseScript::init', 'getBalance', balanceInfo, true);
+    // } catch (e) {
+    //   throw new BaseError(e, {});
+    // } finally {
+    //   this.isInitialized = false;
+    // }
 
     try {
       this.isInitialized = true;
@@ -137,6 +146,7 @@ export class BaseScript extends BaseObject {
   }
 
   _isTickLocked = false;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected async runOnTick(data: Tick) {
     // log('BaseScript::runOnTick', 'Run onTick', { data, iterator: this.iterator }, true);
     if (this._isTickLocked) {
@@ -179,7 +189,7 @@ export class BaseScript extends BaseObject {
     }
   };
 
-  protected runOnTimer = async () => {
+  protected async runOnTimer() {
     try {
       this.iterator++;
       await this.onTimer();
@@ -187,7 +197,7 @@ export class BaseScript extends BaseObject {
     } catch (e) {
       await this.runOnError(e);
     }
-  };
+  }
 
   protected runOnOrderChange = async (orders: Order[]) => {
     try {
@@ -243,7 +253,7 @@ export class BaseScript extends BaseObject {
     }
   };
 
-  async runOnEvent(event, data: any) {
+  async runOnEvent(event: string, data: any) {
     try {
       await this.onEvent(event, data);
       await globals.events.emit('onEvent', { event, data });

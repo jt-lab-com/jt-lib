@@ -48,7 +48,7 @@ class Script extends BaseScript {
     },
     {
       key: 'gridStepPercent',
-      defaultValue: 5,
+      defaultValue: 11,
     },
     {
       key: 'tpPercent',

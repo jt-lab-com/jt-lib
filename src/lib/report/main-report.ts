@@ -413,7 +413,7 @@ export class MainReport extends BaseObject {
   createTable(tableName: string, options?: any, layoutIndex?: number) {
     if (this.tables[tableName]) return;
 
-    this.tables[tableName] = new ReportTable(tableName);
+    this.tables[tableName] = new ReportTable({ title: tableName, name: tableName, ...options });
 
     if (this.isSetLayoutIndexByDefault) {
       this.setLayoutIndex('table', tableName, layoutIndex);
@@ -476,6 +476,13 @@ export class MainReport extends BaseObject {
     this.charts[chartName].addPointByDate(lineName, pointValue, options?.lineColor);
   }
 
+  chartAddPointXY(chartName: string, lineName: string, x: number, y: number, options?: ExtendedReportChartOptions) {
+    if (!this.charts[chartName]) {
+      this.createChart(chartName, options);
+    }
+    this.charts[chartName].addPoint(lineName, x, y, options?.lineColor);
+  }
+
   dropActionButton(action: string) {
     delete this.actionButtons[action];
 
@@ -514,6 +521,7 @@ export class MainReport extends BaseObject {
   }
 
   _lastUpdated = 0;
+
   async updateReport(args: any = {}) {
     if (args && args?.isForce && isTester()) args.isForce = false; // no force update in tester !important
     if (args?.isForce === true && this._lastUpdated && Date.now() - this._lastUpdated < 900) {

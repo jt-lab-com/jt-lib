@@ -5,6 +5,7 @@ declare global {
   /// <reference path="symbol.interface.ts" />
   /// <reference path="tick.interface.ts" />
   /// <reference path="candle.interface.ts" />
+  /// <reference path="system.interface.ts" />
   type GlobalARGS = {
     connectionName: string;
     symbols: string; // "BTC/USDT,ETH/USDT"
@@ -32,7 +33,7 @@ declare global {
   export type Candle = CandleTypes.Candle;
   export type OHLC = CandleTypes.OHLC;
 
-  export type TimeFrame = '1m' | '5m' | '15m' | '1h' | '1d';
+  export type TimeFrame = '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
 
   export type ReportData = ReportTypes.ReportData;
   export type ReportBlock = ReportTypes.ReportBlock;
@@ -85,6 +86,11 @@ declare global {
   export type PositionSideType = OrderTypes.PositionSideType;
 
   export type SymbolInfo = SymbolTypes.Symbol;
+
+  export type StrategyItem = System.StrategyItem;
+  export type Runtime = System.Runtime;
+  export type MarketType = System.MarketType;
+  export type RuntimeArgs = System.RuntimeArgs;
 
   export enum ReportBlockType {
     DRAWDOWN_CHART = 'drawdown_chart',
@@ -440,11 +446,38 @@ declare global {
 
   function systemUsage(): { cpu: number; memory: number };
 
+  function subscribeChannel(channel: string, callback: (data: unknown) => void);
+  function publishChannel(channel: string, data: unknown, toJSON = false);
+  function unsubscribeChannel(channel: string);
+  function unsubscribeAllChannels();
+
   const axios: any;
 
   const getUserId: () => string;
 
   const assert: typeof import('assert');
+
+  async function getStrategies(): Promise<StrategyItem[]>;
+  async function getRuntimeList(): Promise<Runtime[]>;
+  async function createRuntime(
+    name: string,
+    strategy: StrategyItem,
+    exchange: string,
+    marketType: MarketType,
+    args: RuntimeArgs,
+    prefix?: string,
+  ): Promise<string>;
+  async function updateRuntime(
+    id: string,
+    name: string,
+    strategy: StrategyItem,
+    exchange: string,
+    marketType: MarketType,
+    args: RuntimeArgs,
+    prefix: string,
+  ): void;
+  async function startRuntime(id: string): void;
+  async function stopRuntime(id: string): void;
 }
 
 export {};

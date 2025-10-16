@@ -172,7 +172,7 @@ export class Storage extends BaseObject {
     let keyHour = key + '_h' + new Date().getHours();
 
     await this.saveStateCache(keyHour, Object.keys(this.state));
-    warning('Storage::storeState', 'State is stored with key = ' + key, { state: this.state, keyHour, key }, true);
+    log('Storage::storeState', 'State is stored with key = ' + key, { state: this.state, keyHour, key }, true);
 
     return await this.saveStateCache(key, this.state);
   }
