@@ -10,11 +10,7 @@ export class StandardReportLayout extends BaseObject {
   private layout: TesterReportLayout | RuntimeReportLayout;
   private debugLayout: DebugReportLayout;
 
-  constructor(
-    args = {
-      isByTimer: false,
-    },
-  ) {
+  constructor(args: { isByTimer?: boolean; title?: string; description?: string } = { isByTimer: false }) {
     super(args);
 
     if (isTester()) {
@@ -22,7 +18,12 @@ export class StandardReportLayout extends BaseObject {
     } else {
       this.layout = new RuntimeReportLayout(args);
     }
-
+    if (args.title) {
+      globals.report.setTitle(args.title);
+    }
+    if (args.description) {
+      globals.report.setDescription(args.description);
+    }
     if (globals.isDebug) {
       this.debugLayout = new DebugReportLayout();
       this.debugLayout.init();
