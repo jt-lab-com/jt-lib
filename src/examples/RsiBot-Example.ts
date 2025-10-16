@@ -33,7 +33,7 @@ class Script extends BaseScript {
     },
     {
       key: 'sizeUsd',
-      defaultValue: 5,
+      defaultValue: 100,
     },
   ];
 
