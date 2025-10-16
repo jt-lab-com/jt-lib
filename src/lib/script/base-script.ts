@@ -176,8 +176,8 @@ export class BaseScript extends BaseObject {
   isStop = false;
   forceStop(reason: string) {
     this.isStop = true;
-    forceStop();
     error('BaseScript::forceStop', reason, {});
+    forceStop();
     throw new BaseError(reason);
   }
 
