@@ -15,12 +15,13 @@ import { getArgBoolean, getArgNumber, getArgString, uniqueId } from '../core/bas
 import { globals } from '../core/globals';
 import { currentTime, timeToString } from '../utils/date-time';
 import { positionProfit } from './heplers';
-import { isZero, normalize, validateNumbersInObject } from '../utils/numbers';
+import { isZero, normalize, rand, validateNumbersInObject } from '../utils/numbers';
 import { sleep } from '../utils/misc';
 
 export class OrdersBasket extends BaseObject {
   LEVERAGE_INFO_KEY = 'exchange-leverage-info-';
   readonly triggerService: TriggerService;
+  marketType = 'swap' as 'swap' | 'future' | 'spot';
   protected readonly symbol: string;
   protected _connectionName: string;
   protected hedgeMode = false;
@@ -35,7 +36,7 @@ export class OrdersBasket extends BaseObject {
   protected leverage = 1;
   protected prefix: string;
   protected maxLeverage: number;
-  contractSize: number;
+  contractSize = 1;
   _minContractQuoted: number;
   _minContractBase: number;
   _minContractStep: number;
@@ -44,6 +45,7 @@ export class OrdersBasket extends BaseObject {
 
   isInit = false;
   private isGetPositionsForced: boolean;
+  isMock = false;
 
   constructor(params: ExchangeParams) {
     super(params);
@@ -61,7 +63,8 @@ export class OrdersBasket extends BaseObject {
     this.symbol = params.symbol; // TODO validate symbol
     this.leverage = params.leverage ?? this.leverage;
     this.hedgeMode = params.hedgeMode || getArgBoolean('hedgeMode', undefined) || false;
-
+    this.marketType = params?.marketType || (getArgString('marketType', 'swap') as 'swap' | 'future' | 'spot');
+    this.isMock = this.connectionName.toLowerCase().includes('mock');
     this.setPrefix(params.prefix);
 
     globals.events.subscribeOnOrderChange(this.beforeOnPnlChange, this, this.symbol);
@@ -87,28 +90,6 @@ export class OrdersBasket extends BaseObject {
       this.symbolInfo = await this.getSymbolInfo();
       logOnce('OrdersBasket::getSymbolInfo ' + this.symbol, 'symbolInfo', this.symbolInfo);
       this.isInit = true;
-      this.maxLeverage = getArgNumber('defaultLeverage', 10);
-
-      // if (!isTester()) {
-      //   if (!this.symbolInfo) {
-      //     throw new BaseError('OrdersBasket::init symbolInfo is not defined for symbol ' + this.symbol, {
-      //       symbol: this.symbol,
-      //     });
-      //   }
-      // } else {
-      //   //TODO update symbol info for futures in tester (then delete code below)
-      //   this.symbolInfo['limits']['amount']['min'] = 0.00001;
-      //
-      //   if (this._connectionName.includes('binance')) {
-      //     this.symbolInfo['limits']['cost']['min'] = 5;
-      //   }
-      // }
-
-      this.contractSize = this.symbolInfo.contractSize ?? 1;
-      this.maxLeverage = this.symbolInfo['limits']['leverage']['max'] ?? this.maxLeverage;
-      this.updateLimits();
-
-      await this.setLeverage(this.leverage);
 
       if (this.triggerType !== 'script' && this.triggerType !== 'exchange') {
         throw new BaseError('OrdersBasket::init', 'Wrong trigger type ' + this.triggerType);
@@ -127,14 +108,34 @@ export class OrdersBasket extends BaseObject {
       }
 
       //Positions slot initialization
-      this.posSlot['long'] = await this.getPositionBySide('long', true);
-      this.posSlot['short'] = await this.getPositionBySide('short');
+      this.contractSize = this.symbolInfo.contractSize ?? 1;
+
+      if (this.marketType === 'swap' || this.marketType === 'future') {
+        this.maxLeverage = getArgNumber('defaultLeverage', 10);
+        this.maxLeverage = this.symbolInfo['limits']['leverage']['max'] ?? this.maxLeverage;
+        this.updateLimits();
+
+        await this.setLeverage(this.leverage);
+
+        this.posSlot['long'] = await this.getPositionBySide('long', true);
+        this.posSlot['short'] = await this.getPositionBySide('short');
+      } else {
+        this.posSlot['long'] = this.emulatePosition('long');
+        this.posSlot['short'] = this.emulatePosition('short');
+      }
 
       log('OrdersBasket::init', '', this.orderBasketInfo(), true);
     } catch (e) {
       this.isInit = false;
       throw new BaseError(e);
     }
+
+    await this.mockDelay();
+  }
+
+  mockDelay() {
+    if (!this.isMock) return;
+    return sleep(rand(300, 700));
   }
   orderBasketInfo() {
     return {
@@ -297,7 +298,8 @@ export class OrdersBasket extends BaseObject {
     }
 
     position.contracts = isZero(position.contracts) ? 0 : position.contracts;
-    position.notional = this.getUsdAmount(position.contracts, position.entryPrice);
+
+    this._updatePosition(position);
 
     if (position.contracts < 0) {
       throw new BaseError('OrderBasket::_updatePosSlot posSlot.size < 0', {
@@ -325,7 +327,14 @@ export class OrdersBasket extends BaseObject {
       position,
       order,
     });
+
     return pnl;
+  }
+
+  _updatePosition(pos: Position) {
+    pos.unrealizedPnl = positionProfit(pos.side, pos.entryPrice, this.close(), pos.contracts, this.contractSize);
+    pos.notional = this.getUsdAmount(pos.contracts, pos.entryPrice);
+    pos.initialMargin = pos.notional / pos.leverage;
   }
 
   async beforeOnPnlChange(order: Order): Promise<any> {
@@ -395,11 +404,21 @@ export class OrdersBasket extends BaseObject {
     const args = { type, side, amount, price, params };
 
     if (!this.isInit) throw new BaseError('OrdersBasket::createOrder - OrdersBasket is not initialized', args);
-    if (validateNumbersInObject({ amount, price }) === false)
-      throw new BaseError('OrdersBasket::createOrder - wrong amount or price', args);
-    if (amount <= 0) throw new BaseError('OrdersBasket::createOrder amount must be > 0', args);
+    if (validateNumbersInObject({ amount, price }, false) === false)
+      throw new BaseError('OrdersBasket::createOrder - wrong amount or price', {
+        args,
+        ...(await this.marketInfoShort()),
+      });
+    if (amount <= 0)
+      throw new BaseError('OrdersBasket::createOrder amount must be > 0', {
+        args,
+        ...(await this.marketInfoShort()),
+      });
     if (!['sell', 'buy'].includes(side))
-      throw new BaseError('OrdersBasket::createOrder side must be buy or sell', args);
+      throw new BaseError('OrdersBasket::createOrder side must be buy or sell', {
+        args,
+        ...(await this.marketInfoShort()),
+      });
 
     if (this.hedgeMode) {
       params['positionSide'] = side === 'buy' ? 'long' : 'short';
@@ -527,7 +546,10 @@ export class OrdersBasket extends BaseObject {
         marketInfo: await this.marketInfoShort(),
         e,
       });
+    } finally {
+      await this.mockDelay();
     }
+
     if (this.connectionName.includes('bybit') && !isTester() && order.id) {
       //TODO emulate order for bybit (bybit return only id) -> move it to Environment
 
@@ -675,6 +697,8 @@ export class OrdersBasket extends BaseObject {
       return order;
     } catch (e) {
       throw new BaseError(e, { ...args, order: this.ordersByClientId.get(orderId) });
+    } finally {
+      await this.mockDelay();
     }
   }
 
@@ -700,6 +724,8 @@ export class OrdersBasket extends BaseObject {
       return order;
     } catch (e) {
       throw new BaseError(e, { orderId, symbol: this.symbol });
+    } finally {
+      await this.mockDelay();
     }
   }
 
@@ -914,10 +940,20 @@ export class OrdersBasket extends BaseObject {
   }
 
   async getPositions(isForce = false) {
+    if (this.marketType === 'spot') {
+      if (!this.posSlot['long']) {
+        this.posSlot['long'] = this.emulatePosition('long');
+        this.posSlot['short'] = this.emulatePosition('short');
+      }
+
+      return [Object.values(this.posSlot)];
+    }
+
     if (this.isGetPositionsForced) {
       isForce = true;
       this.isGetPositionsForced = false;
     }
+
     const positions = await getPositions([this.symbol], { forceFetch: isForce });
 
     if (!isTester() && globals.isDebug) {
@@ -1168,19 +1204,16 @@ export class OrdersBasket extends BaseObject {
     // getOpenOrders is not working in tester mode, use getOrders and filter by status
     if (isTester()) {
       const orders = [];
-
       for (const order of await this.getOrders()) {
         if (order.status === 'open') {
           orders.push(order);
         }
       }
-
       return orders;
     }
 
     try {
       since = since ?? currentTime() - 7 * 24 * 60 * 60 * 1000; // 7 days by default
-
       return await getOpenOrders(this.symbol, since, limit, params);
     } catch (e) {
       throw new BaseError(e, await this.marketInfoShort());

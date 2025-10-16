@@ -74,9 +74,9 @@ class Script extends BaseScript {
   }
 
   // Purchase function
-  buyDCA = async () => {
+  async buyDCA() {
     const amount = this.dcaBasket.getContractsAmount(this.sizeUsd);
     await this.dcaBasket.buyMarket(amount);
     log('DCA purchase completed', `amount: ${amount}, price: ${this.dcaBasket.close()}`);
-  };
+  }
 }

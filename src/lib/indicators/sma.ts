@@ -14,6 +14,7 @@ export class SimpleMovingAverageIndicator extends BaseIndicator {
   private lastIndex = 0;
   private sum = 0;
   private lastTimeUpdated = 0;
+  private isDebug = false;
 
   constructor(buffer: CandlesBuffer, options: SimpleMovingAverageIndicatorOptions) {
     super(options.symbol, options.timeframe, buffer);
