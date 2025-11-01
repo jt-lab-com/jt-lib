@@ -1,6 +1,6 @@
 import { globals } from '../../core/globals';
 import { BaseObject } from '../../core/base-object';
-import { currentTime } from '../../utils/date-time';
+import { currentTime, timeCurrent, timeToStrHms } from '../../utils/date-time';
 import { error, log, logOnce, trace, warning } from '../../core/log';
 
 import {
@@ -71,6 +71,7 @@ export class DebugReportLayout extends BaseObject {
       error('BasketsReportLayout::doByTimer', 'Error in doByTimer', { e, diff });
     }
   };
+
   isInit = false;
   init() {
     if (this.isInit || globals.isDebug === false) return;
@@ -114,6 +115,7 @@ export class DebugReportLayout extends BaseObject {
     }
   };
   async showData() {
+    //globals.report.cardSetValue('Debug Upd', timeToStrHms(timeCurrent()));
     if (this.isDebugAllPositions) await debugAllPositions();
     if (this.isDebugAllTriggers) debugAllTriggers();
     if (this.isDebugAllEvents) debugAllEvents();

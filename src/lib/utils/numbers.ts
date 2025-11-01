@@ -41,6 +41,26 @@ export const validateNumbersInObject = (obj: any, showWarning = false): boolean 
   return true;
 };
 
+export const validateNumberArray = (arr: any[], showWarning = false): boolean => {
+  if (!Array.isArray(arr)) {
+    throw new BaseError('The argument must be an array');
+  }
+
+  const wrongValues = [];
+  for (let i = 0; i < arr.length; i++) {
+    if (!isRealNumber(arr[i])) {
+      wrongValues.push({ index: i, value: arr[i], vType: typeof arr[i] });
+    }
+  }
+
+  if (wrongValues.length > 0) {
+    if (showWarning)
+      warning('validateNumberArray', 'All elements of the array must be valid numbers. Wrong values: ', wrongValues);
+    return false;
+  }
+  return true;
+};
+
 export const isRealNumber = (number: number) => {
   return typeof number === 'number' && isFinite(number);
 };
@@ -129,12 +149,14 @@ export const isBetween = (number: number, min: number, max: number): boolean => 
  * @param a The base number (what we compare from)
  * @param b The compared number (what we compare to)
  * @param isAbs Whether to return the absolute value of the percentage difference
+ * @param isError
  * @returns {number} Percentage difference of b relative to a
  * @example percentDifference(100, 90) // (90 - 100) / 100 * 100 = -10
  * @example percentDifference(100,110) // (110 - 100) / 100 * 100 = 10
  */
-export const percentDifference = (a: number, b: number, isAbs = false): number => {
+export const percentDifference = (a: number, b: number, isAbs = false, isError = true): number => {
   if (isNaN(a) || isNaN(b)) {
+    if (!isError) return 0;
     throw new BaseError('percentDifference: at least one of arguments is NaN', { a, b });
   }
 

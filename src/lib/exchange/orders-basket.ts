@@ -20,9 +20,9 @@ import { sleep } from '../utils/misc';
 
 export class OrdersBasket extends BaseObject {
   LEVERAGE_INFO_KEY = 'exchange-leverage-info-';
-  readonly triggerService: TriggerService;
+  protected readonly triggerService: TriggerService;
   marketType = 'swap' as 'swap' | 'future' | 'spot';
-  protected readonly symbol: string;
+  readonly symbol: string;
   protected _connectionName: string;
   protected hedgeMode = false;
   protected readonly triggerType: TriggerType = 'script';
@@ -32,7 +32,7 @@ export class OrdersBasket extends BaseObject {
   protected readonly stopOrdersByOwnerShortId = new Map<string, StopOrderData>();
   protected readonly stopOrdersQueue = new Map<string, StopOrderQueueItem>();
 
-  protected symbolInfo: SymbolInfo;
+  protected __symbolInfo: SymbolInfo;
   protected leverage = 1;
   protected prefix: string;
   protected maxLeverage: number;
@@ -67,14 +67,24 @@ export class OrdersBasket extends BaseObject {
     this.isMock = this.connectionName.toLowerCase().includes('mock');
     this.setPrefix(params.prefix);
 
+    this._subscribeEvents(params);
+
+    const symbol = this.symbol;
+    this.triggerService = new TriggerService({ idPrefix: this.symbol, symbol, storageKey: symbol });
+    this._registerTriggersHandlers();
+  }
+
+  _subscribeEvents(params: ExchangeParams) {
     globals.events.subscribeOnOrderChange(this.beforeOnPnlChange, this, this.symbol);
     globals.events.subscribeOnOrderChange(this.beforeOnOrderChange, this, this.symbol);
 
     const onTickInterval = params.onTickInterval || 1000;
     globals.events.subscribeOnTick(this.beforeOnTick, this, this.symbol, onTickInterval);
+  }
 
+  _registerTriggersHandlers() {
     const symbol = this.symbol;
-    this.triggerService = new TriggerService({ idPrefix: this.symbol, symbol, storageKey: symbol });
+
     this.triggerService.registerPriceHandler(symbol, 'executeStopLoss', this.createOrderByTrigger, this);
     this.triggerService.registerPriceHandler(symbol, 'executeTakeProfit', this.createOrderByTrigger, this);
     this.triggerService.registerPriceHandler(symbol, 'createOrderByTrigger', this.createOrderByTrigger, this);
@@ -84,15 +94,27 @@ export class OrdersBasket extends BaseObject {
 
     this.addChild(this.triggerService);
   }
-
   async init() {
     try {
-      this.symbolInfo = await this.getSymbolInfo();
-      logOnce('OrdersBasket::getSymbolInfo ' + this.symbol, 'symbolInfo', this.symbolInfo);
+      this.__symbolInfo = await this.symbolInfo(this.symbol);
+      if (!this.__symbolInfo) {
+        throw new BaseError('OrdersBasket::init Symbol info not found for symbol ' + this.symbol, {
+          t: '000',
+          info: await this.marketInfoShort(),
+        });
+      }
+
+      if (!this.__symbolInfo.active) {
+        throw new BaseError('OrdersBasket::init Symbol ' + this.symbol + ' is not active', {
+          info: await this.marketInfoShort(),
+        });
+      }
+
+      logOnce('OrdersBasket::getSymbolInfo ' + this.symbol, 'symbolInfo', this.__symbolInfo);
       this.isInit = true;
 
       if (this.triggerType !== 'script' && this.triggerType !== 'exchange') {
-        throw new BaseError('OrdersBasket::init', 'Wrong trigger type ' + this.triggerType);
+        throw new BaseError('OrdersBasket::init Wrong trigger type ' + this.triggerType);
       }
 
       //get opens orders
@@ -108,11 +130,11 @@ export class OrdersBasket extends BaseObject {
       }
 
       //Positions slot initialization
-      this.contractSize = this.symbolInfo.contractSize ?? 1;
+      this.contractSize = this.__symbolInfo.contractSize ?? 1;
 
       if (this.marketType === 'swap' || this.marketType === 'future') {
         this.maxLeverage = getArgNumber('defaultLeverage', 10);
-        this.maxLeverage = this.symbolInfo['limits']['leverage']['max'] ?? this.maxLeverage;
+        this.maxLeverage = this.__symbolInfo['limits']['leverage']['max'] ?? this.maxLeverage;
         this.updateLimits();
 
         await this.setLeverage(this.leverage);
@@ -158,18 +180,18 @@ export class OrdersBasket extends BaseObject {
   }
 
   updateLimits() {
-    this._minContractStep = this.symbolInfo.limits.amount.min;
+    this._minContractStep = this.__symbolInfo.limits.amount.min;
 
-    if (!this.symbolInfo?.limits?.amount?.min) {
+    if (!this.__symbolInfo?.limits?.amount?.min) {
       throw new BaseError('OrdersBasket::init min amount is not defined for symbol ' + this.symbol, {
-        symbolInfo: this.symbolInfo,
+        symbolInfo: this.__symbolInfo,
       });
     }
 
-    if (this.symbolInfo.limits?.cost?.min) {
-      this._minContractQuoted = this.symbolInfo.limits.cost.min;
+    if (this.__symbolInfo.limits?.cost?.min) {
+      this._minContractQuoted = this.__symbolInfo.limits.cost.min;
     } else {
-      this._minContractQuoted = this.getUsdAmount(this.symbolInfo.limits.amount.min, this.close());
+      this._minContractQuoted = this.getUsdAmount(this.__symbolInfo.limits.amount.min, this.close());
     }
 
     //TODO update symbolInfo minCost (bybit minCost is 5 but not info in symbolInfo)
@@ -337,7 +359,7 @@ export class OrdersBasket extends BaseObject {
     pos.initialMargin = pos.notional / pos.leverage;
   }
 
-  async beforeOnPnlChange(order: Order): Promise<any> {
+  private async beforeOnPnlChange(order: Order): Promise<any> {
     try {
       if (order.status === 'closed') {
         let pnl = 0;
@@ -382,6 +404,44 @@ export class OrdersBasket extends BaseObject {
     }
   };
 
+  async _createOrder(
+    symbol: string,
+    type: OrderType,
+    side: OrderSide,
+    amount: number,
+    price: number,
+    params: Record<string, unknown>,
+  ) {
+    return await createOrder(symbol, type, side, amount, price, params);
+  }
+
+  async _modifyOrder(orderId: string, symbol: string, type: OrderType, side: OrderSide, amount: number, price: number) {
+    return await modifyOrder(orderId, symbol, type, side, amount, price);
+  }
+
+  async _cancelOrder(orderId: string, symbol: string) {
+    return await cancelOrder(orderId, symbol);
+  }
+
+  async _getOrders(symbol: string, since?: number, limit?: number, params?: any) {
+    return await getOrders(symbol, since, limit, params);
+  }
+
+  async _getOpenOrders(symbol: string, since?: number, limit?: number, params?: any) {
+    return await getOpenOrders(symbol, since, limit, params);
+  }
+
+  async _getClosedOrders(symbol: string, since?: number, limit?: number, params?: any) {
+    return await getClosedOrders(symbol, since, limit, params);
+  }
+
+  async _getPositions(symbols: string[], options?: { forceFetch?: boolean }) {
+    return await getPositions(symbols, options);
+  }
+
+  async symbolInfo(symbol: string) {
+    return await symbolInfo(symbol);
+  }
   /**
    * Create order on exchange
    * @param type - 'market' or 'limit'
@@ -433,7 +493,7 @@ export class OrdersBasket extends BaseObject {
     const clientOrderId = this.generateClientOrderId(
       this.prefix,
       type,
-      !!params['reduceOnly'] ?? false,
+      !!params['reduceOnly'] || false,
       params['ownerClientOrderId'] as string,
       params['triggerOrderType'] as string,
       params['postfix'] as string,
@@ -532,7 +592,7 @@ export class OrdersBasket extends BaseObject {
 
     const orderArgs = { symbol: this.symbol, type, side, amount, price, params: orderParams };
     try {
-      order = await createOrder(this.symbol, type, side, amount, price, orderParams);
+      order = await this._createOrder(this.symbol, type, side, amount, price, orderParams);
 
       // After creating the order, we force an update of the positions to ensure accuracy.
       // Because positions may not be updated by websocket
@@ -692,7 +752,7 @@ export class OrdersBasket extends BaseObject {
     const args = { orderId, symbol: this.symbol, type, side, amount, price };
 
     try {
-      const order = await modifyOrder(orderId, this.symbol, type, side, amount, price);
+      const order = await this._modifyOrder(orderId, this.symbol, type, side, amount, price);
 
       return order;
     } catch (e) {
@@ -713,7 +773,7 @@ export class OrdersBasket extends BaseObject {
         error('Exchange:cancelOrder ', 'orderId must be string ', { orderId, orderIdType: typeof orderId });
         return {};
       }
-      const order = await cancelOrder(orderId, this.symbol);
+      const order = await this._cancelOrder(orderId, this.symbol);
 
       if (!order || !order.id) {
         warning('Exchange:cancelOrder', 'Order not found or already canceled', { orderId, symbol: this.symbol });
@@ -954,7 +1014,7 @@ export class OrdersBasket extends BaseObject {
       this.isGetPositionsForced = false;
     }
 
-    const positions = await getPositions([this.symbol], { forceFetch: isForce });
+    const positions = await this._getPositions([this.symbol], { forceFetch: isForce });
 
     if (!isTester() && globals.isDebug) {
       logOnce('OrdersBasket::getPositions', this.symbol, { positions, isForce });
@@ -1196,7 +1256,7 @@ export class OrdersBasket extends BaseObject {
 
   //TODO check prefix and return only orders for current Orders Basket
   async getOrders(since = undefined, limit = 100, params: any = undefined) {
-    return await getOrders(this.symbol, since, limit, params);
+    return await this._getOrders(this.symbol, since, limit, params);
   }
 
   async getOpenOrders(since = undefined, limit = 100, params: any = undefined) {
@@ -1214,7 +1274,7 @@ export class OrdersBasket extends BaseObject {
 
     try {
       since = since ?? currentTime() - 7 * 24 * 60 * 60 * 1000; // 7 days by default
-      return await getOpenOrders(this.symbol, since, limit, params);
+      return await this._getOpenOrders(this.symbol, since, limit, params);
     } catch (e) {
       throw new BaseError(e, await this.marketInfoShort());
     }
@@ -1235,7 +1295,7 @@ export class OrdersBasket extends BaseObject {
 
     try {
       since = since ?? currentTime() - 30 * 24 * 60 * 60 * 1000; // 7 days by default
-      return await getClosedOrders(this.symbol, since, limit, params);
+      return await this._getClosedOrders(this.symbol, since, limit, params);
     } catch (e) {
       throw new BaseError(e, await this.marketInfoShort());
     }
@@ -1324,6 +1384,9 @@ export class OrdersBasket extends BaseObject {
     return info;
   }
 
+  async _setLeverage(leverage: number, symbol: string) {
+    return await setLeverage(this.leverage, this.symbol);
+  }
   async setLeverage(leverage: number) {
     if (leverage) this.leverage = leverage;
 
@@ -1339,7 +1402,7 @@ export class OrdersBasket extends BaseObject {
 
     if (leverageInfo !== this.leverage) {
       try {
-        const response = await setLeverage(this.leverage, this.symbol);
+        const response = this._setLeverage(this.leverage, this.symbol);
         await globals.storage.set(levKey, this.leverage);
         log('OrderBasket:setLeverage', this.leverage + ' ' + this.symbol, { response });
       } catch (e) {
@@ -1351,7 +1414,7 @@ export class OrdersBasket extends BaseObject {
           });
           await globals.storage.set(levKey, this.leverage);
         } else {
-          throw new BaseError(e, { leverage: this.leverage, symbol: this.symbol, symbolInfo: this.symbolInfo });
+          throw new BaseError(e, { leverage: this.leverage, symbol: this.symbol, symbolInfo: this.__symbolInfo });
         }
       }
     } else {
@@ -1371,6 +1434,6 @@ export class OrdersBasket extends BaseObject {
   }
 
   async getSymbolInfo() {
-    return await symbolInfo(this.symbol);
+    return await this.symbolInfo(this.symbol);
   }
 }

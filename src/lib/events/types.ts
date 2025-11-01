@@ -71,7 +71,8 @@ export type EventName =
   | 'onBeforeTick' // Deprecated
   | 'onAfterTick' // Deprecated
   | `onOrderChange_${string}` // Dynamic symbol-based order change events
-  | `onTick_${string}`; // Dynamic symbol-based tick events
+  | `onTick_${string}` // Dynamic symbol-based tick events
+  | string;
 
 // Helper aliases for template-literal events
 export type SymbolOrderChangeEvent = `onOrderChange_${string}`;

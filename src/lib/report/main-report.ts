@@ -1,4 +1,4 @@
-import { ReportTable, TableRow } from './widgets/report-table';
+import { ReportTable, ReportTableOptions, TableRow } from './widgets/report-table';
 import { ChartType, ReportChart, ReportChartOptions } from './widgets/report-chart';
 import { ReportCard, ReportCardParams } from './widgets/report-card';
 import { ReportActionButton } from './widgets/report-action-button';
@@ -410,10 +410,10 @@ export class MainReport extends BaseObject {
     else this.texts[textName].setText(text);
   }
 
-  createTable(tableName: string, options?: any, layoutIndex?: number) {
+  createTable(tableName: string, options?: ReportTableOptions, layoutIndex?: number) {
     if (this.tables[tableName]) return;
 
-    this.tables[tableName] = new ReportTable({ title: tableName, name: tableName, ...options });
+    this.tables[tableName] = new ReportTable({ title: tableName, ...options, name: tableName });
 
     if (this.isSetLayoutIndexByDefault) {
       this.setLayoutIndex('table', tableName, layoutIndex);
