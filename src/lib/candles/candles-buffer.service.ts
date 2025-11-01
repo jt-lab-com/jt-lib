@@ -19,4 +19,3 @@ export class CandlesBufferService extends BaseObject {
     return buffer;
   }
 }
-//

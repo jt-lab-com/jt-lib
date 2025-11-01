@@ -3,30 +3,19 @@ import { trace } from '../../core/log';
 import { globals } from '../../core/globals';
 
 export type TableRow = object;
-export interface ReportTableOptions {
-  title?: string;
-  isVisible?: boolean;
-  maxRows?: number;
-  name?: string;
-}
+
 export class ReportTable extends ReportWidget {
   private rows: Record<string, TableRow> = {};
   private counter = 0;
   private MAX_ROWS = 300;
-  name = 'Table';
   title: string;
 
-  constructor(options: ReportTableOptions = {}) {
+  constructor(options: { title?: string; isVisible?: boolean }) {
     super();
     this.title = options.title || 'Table';
     this.isVisible = options.isVisible !== undefined ? options.isVisible : true;
-    this.MAX_ROWS = options.maxRows || this.MAX_ROWS;
-    this.name = options.name || this.name;
   }
 
-  getRowById(id: string | number): TableRow | undefined {
-    return this.rows[id];
-  }
   get length() {
     return Object.keys(this.rows).length;
   }

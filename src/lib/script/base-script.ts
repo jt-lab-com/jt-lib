@@ -139,7 +139,7 @@ export class BaseScript extends BaseObject {
       await this.onInit();
     } catch (e) {
       error(e);
-      this.forceStop('Initialization error: ' + e.message);
+      throw new BaseError(e, {});
     } finally {
       this.isInitialized = false;
     }
@@ -147,7 +147,7 @@ export class BaseScript extends BaseObject {
 
   _isTickLocked = false;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected async runOnTick(data: Tick = {}) {
+  protected async runOnTick(data: Tick) {
     // log('BaseScript::runOnTick', 'Run onTick', { data, iterator: this.iterator }, true);
     if (this._isTickLocked) {
       return;
@@ -176,15 +176,8 @@ export class BaseScript extends BaseObject {
   isStop = false;
   forceStop(reason: string) {
     this.isStop = true;
-    this.stop()
-      .catch((e) => {
-        error('BaseScript::forceStop:stop', e, {});
-      })
-      .finally(() => {
-        forceStop();
-      });
     error('BaseScript::forceStop', reason, {});
-
+    forceStop();
     throw new BaseError(reason);
   }
 
@@ -280,7 +273,6 @@ export class BaseScript extends BaseObject {
 
   protected async stop() {
     log('Script:stop', '===========================Stop===========================', {}, true);
-    this.isStop = true;
     try {
       await globals.events.emit('onBeforeStop');
       await globals.events.emit('onStop');

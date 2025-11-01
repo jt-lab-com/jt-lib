@@ -457,21 +457,6 @@ declare global {
 
   const assert: typeof import('assert');
 
-  async function subscribeDataFeedDynamic(
-    method: string,
-    exchange: string,
-    marketType: MarketType,
-    symbol: string | string[],
-    keys?: { apiKey: string; secret: string; password?: string; sandboxMode?: boolean },
-  ): Promise<{ subscribeId: number; subscriptionKey: string }>;
-
-  async function unsubscribeDataFeedDynamic(
-    method: string,
-    exchange: string,
-    marketType: MarketType,
-    symbol: string | string[],
-  ): Promise<{ status: string; message: string }>;
-
   async function getStrategies(): Promise<StrategyItem[]>;
   async function getRuntimeList(): Promise<Runtime[]>;
   async function createRuntime(
@@ -482,7 +467,6 @@ declare global {
     args: RuntimeArgs,
     prefix?: string,
   ): Promise<string>;
-
   async function updateRuntime(
     id: string,
     name: string,

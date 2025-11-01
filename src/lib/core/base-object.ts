@@ -7,7 +7,7 @@ import { currentTime } from '../utils/date-time';
 export class BaseObject {
   _id: string = '';
   _isDestroyed = false;
-
+  _listenersId: any = [];
   _created = currentTime();
   _children: BaseObject[] = [];
 
