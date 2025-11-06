@@ -470,6 +470,7 @@ declare global {
     exchange: string,
     marketType: MarketType,
     symbol: string | string[],
+    keys?: { apiKey: string; secret: string; password?: string; sandboxMode?: boolean },
   ): Promise<{ status: string; message: string }>;
 
   async function getStrategies(): Promise<StrategyItem[]>;

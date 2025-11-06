@@ -20,8 +20,9 @@ import { sleep } from '../utils/misc';
 
 export class OrdersBasket extends BaseObject {
   LEVERAGE_INFO_KEY = 'exchange-leverage-info-';
-  protected readonly triggerService: TriggerService;
+  protected triggerService: TriggerService;
   marketType = 'swap' as 'swap' | 'future' | 'spot';
+  marginMode = 'cross'; // isolated | cross
   readonly symbol: string;
   protected _connectionName: string;
   protected hedgeMode = false;
@@ -32,8 +33,8 @@ export class OrdersBasket extends BaseObject {
   protected readonly stopOrdersByOwnerShortId = new Map<string, StopOrderData>();
   protected readonly stopOrdersQueue = new Map<string, StopOrderQueueItem>();
 
-  protected __symbolInfo: SymbolInfo;
-  protected leverage = 1;
+  protected _symbolInfo: SymbolInfo;
+  leverage = 1;
   protected prefix: string;
   protected maxLeverage: number;
   contractSize = 1;
@@ -46,6 +47,7 @@ export class OrdersBasket extends BaseObject {
   isInit = false;
   private isGetPositionsForced: boolean;
   isMock = false;
+  private _onTickInterval: number;
 
   constructor(params: ExchangeParams) {
     super(params);
@@ -67,23 +69,21 @@ export class OrdersBasket extends BaseObject {
     this.isMock = this.connectionName.toLowerCase().includes('mock');
     this.setPrefix(params.prefix);
 
-    this._subscribeEvents(params);
-
-    const symbol = this.symbol;
-    this.triggerService = new TriggerService({ idPrefix: this.symbol, symbol, storageKey: symbol });
-    this._registerTriggersHandlers();
+    this._onTickInterval = params.onTickInterval || 1000;
   }
 
-  _subscribeEvents(params: ExchangeParams) {
+  async _subscribeEvents() {
     globals.events.subscribeOnOrderChange(this.beforeOnPnlChange, this, this.symbol);
     globals.events.subscribeOnOrderChange(this.beforeOnOrderChange, this, this.symbol);
 
-    const onTickInterval = params.onTickInterval || 1000;
+    const onTickInterval = this._onTickInterval || 1000;
     globals.events.subscribeOnTick(this.beforeOnTick, this, this.symbol, onTickInterval);
   }
 
-  _registerTriggersHandlers() {
+  async _registerTriggers() {
     const symbol = this.symbol;
+
+    this.triggerService = new TriggerService({ idPrefix: this.symbol, symbol, storageKey: symbol });
 
     this.triggerService.registerPriceHandler(symbol, 'executeStopLoss', this.createOrderByTrigger, this);
     this.triggerService.registerPriceHandler(symbol, 'executeTakeProfit', this.createOrderByTrigger, this);
@@ -95,22 +95,26 @@ export class OrdersBasket extends BaseObject {
     this.addChild(this.triggerService);
   }
   async init() {
+    await this._subscribeEvents();
+
+    await this._registerTriggers();
+
     try {
-      this.__symbolInfo = await this.symbolInfo(this.symbol);
-      if (!this.__symbolInfo) {
+      this._symbolInfo = await this.symbolInfo(this.symbol);
+      if (!this._symbolInfo) {
         throw new BaseError('OrdersBasket::init Symbol info not found for symbol ' + this.symbol, {
           t: '000',
           info: await this.marketInfoShort(),
         });
       }
 
-      if (!this.__symbolInfo.active) {
+      if (!this._symbolInfo.active) {
         throw new BaseError('OrdersBasket::init Symbol ' + this.symbol + ' is not active', {
           info: await this.marketInfoShort(),
         });
       }
 
-      logOnce('OrdersBasket::getSymbolInfo ' + this.symbol, 'symbolInfo', this.__symbolInfo);
+      logOnce('OrdersBasket::getSymbolInfo ' + this.symbol, 'symbolInfo', this._symbolInfo);
       this.isInit = true;
 
       if (this.triggerType !== 'script' && this.triggerType !== 'exchange') {
@@ -130,11 +134,11 @@ export class OrdersBasket extends BaseObject {
       }
 
       //Positions slot initialization
-      this.contractSize = this.__symbolInfo.contractSize ?? 1;
+      this.contractSize = this._symbolInfo.contractSize ?? 1;
 
       if (this.marketType === 'swap' || this.marketType === 'future') {
         this.maxLeverage = getArgNumber('defaultLeverage', 10);
-        this.maxLeverage = this.__symbolInfo['limits']['leverage']['max'] ?? this.maxLeverage;
+        this.maxLeverage = this._symbolInfo['limits']['leverage']['max'] ?? this.maxLeverage;
         this.updateLimits();
 
         await this.setLeverage(this.leverage);
@@ -173,6 +177,7 @@ export class OrdersBasket extends BaseObject {
       _minContractBase: this._minContractBase,
       minContractStep: this._minContractStep,
       loadedOpenOrders: this.ordersByClientId.size,
+      symbolInfo: this._symbolInfo,
     };
   }
   private async beforeOnTick() {
@@ -180,24 +185,24 @@ export class OrdersBasket extends BaseObject {
   }
 
   updateLimits() {
-    this._minContractStep = this.__symbolInfo.limits.amount.min;
+    this._minContractStep = this._symbolInfo.limits.amount.min;
 
-    if (!this.__symbolInfo?.limits?.amount?.min) {
+    if (!this._symbolInfo?.limits?.amount?.min) {
       throw new BaseError('OrdersBasket::init min amount is not defined for symbol ' + this.symbol, {
-        symbolInfo: this.__symbolInfo,
+        symbolInfo: this._symbolInfo,
       });
     }
 
-    if (this.__symbolInfo.limits?.cost?.min) {
-      this._minContractQuoted = this.__symbolInfo.limits.cost.min;
+    if (this._symbolInfo.limits?.cost?.min) {
+      this._minContractQuoted = this._symbolInfo.limits.cost.min;
     } else {
-      this._minContractQuoted = this.getUsdAmount(this.__symbolInfo.limits.amount.min, this.close());
+      this._minContractQuoted = this.getUsdAmount(this._symbolInfo.limits.amount.min, this.close());
     }
 
     //TODO update symbolInfo minCost (bybit minCost is 5 but not info in symbolInfo)
-    if (this._connectionName.includes('bybit')) {
-      this._minContractQuoted = 5;
-    }
+    // if (this._connectionName.includes('bybit')) {
+    //   this._minContractQuoted = 1;
+    // }
 
     this._minContractBase = this.getContractsAmount(this._minContractQuoted);
   }
@@ -604,7 +609,6 @@ export class OrdersBasket extends BaseObject {
         userParams,
         args,
         marketInfo: await this.marketInfoShort(),
-        e,
       });
     } finally {
       await this.mockDelay();
@@ -893,7 +897,8 @@ export class OrdersBasket extends BaseObject {
       if (!amount) {
         amount = position.contracts;
       }
-      return this.createOrder('market', reduceSide, amount, 0, { ...params, reduceOnly: true });
+      const price = reduceSide === 'sell' ? this.ask() : this.bid();
+      return this.createOrder('market', reduceSide, amount, price, { ...params, reduceOnly: true });
     }
   }
 
@@ -1195,7 +1200,6 @@ export class OrdersBasket extends BaseObject {
     };
   }
 
-  marginMode = 'cross'; // isolated | cross
   private validateParams(params: Record<string, unknown>): {
     orderParams: Record<string, number | string | boolean>;
     userParams: Record<string, number | string | boolean>;
@@ -1323,23 +1327,29 @@ export class OrdersBasket extends BaseObject {
     return contractsAmount * executionPrice * this.contractSize; // 1*0.5*10 = 5
   };
 
-  ask() {
-    //TODO fix ask bid in tester
+  ask(level = 0) {
     if (isTester()) return this.price();
-    return ask(this.symbol)?.[0];
+    return ask(this.symbol)?.[level];
   }
 
-  askVolume() {
-    return ask(this.symbol)?.[1];
+  askVolume(level = 0) {
+    return ask(this.symbol)?.[level];
+  }
+  askVolumeQuoted(level = 0) {
+    return this.getUsdAmount(this.askVolume(level), this.ask(level));
   }
 
-  bid() {
+  bidVolumeQuoted(level = 0) {
+    return this.getUsdAmount(this.bidVolume(level), this.bid(level));
+  }
+
+  bid(level = 0) {
     if (isTester()) return this.price();
-    return bid(this.symbol)?.[0];
+    return bid(this.symbol)?.[level];
   }
 
-  bidVolume() {
-    return bid(this.symbol)?.[1];
+  bidVolume(level = 0) {
+    return bid(this.symbol)?.[level];
   }
 
   high() {
@@ -1414,7 +1424,7 @@ export class OrdersBasket extends BaseObject {
           });
           await globals.storage.set(levKey, this.leverage);
         } else {
-          throw new BaseError(e, { leverage: this.leverage, symbol: this.symbol, symbolInfo: this.__symbolInfo });
+          throw new BaseError(e, { leverage: this.leverage, symbol: this.symbol, symbolInfo: this._symbolInfo });
         }
       }
     } else {
